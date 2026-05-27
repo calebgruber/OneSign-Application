@@ -20,7 +20,7 @@ $recent = db()->query("SELECT a.event_type, a.card_id, a.workstation, a.success,
     FROM audit_log a LEFT JOIN users u ON a.user_id=u.id
     ORDER BY a.created_at DESC LIMIT 10")->fetchAll();
 
-$workstations = db()->query("SELECT w.hostname, w.ip_address, w.status, w.last_heartbeat, w.agent_version, u.full_name AS current_user
+$workstations = db()->query("SELECT w.hostname, w.ip_address, w.status, w.last_heartbeat, w.agent_version, u.full_name AS `current_user`
     FROM workstations w LEFT JOIN users u ON w.current_user_id=u.id ORDER BY w.last_heartbeat DESC")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
