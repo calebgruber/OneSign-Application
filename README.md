@@ -126,7 +126,7 @@ install_service.bat
 ### Method 2 — Live Reader
 1. Plug the pcProx reader into a workstation running the agent.
 2. In the admin panel, go to **Enroll Card → Live Reader Enrollment**.
-3. Select the user and enter the workstation hostname.
+3. Select the user and choose the target workstation from the dropdown.
 4. Click **Start Live Enrollment** — then tap the badge on the reader.
 5. The badge is enrolled automatically.
 

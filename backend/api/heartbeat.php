@@ -33,4 +33,16 @@ if ($wsRow) {
         ->execute([$workstation, $ip, $osVersion, $agentVer, $status]);
 }
 
-jsonResponse(['ok' => true]);
+$pingRequested = false;
+if (function_exists('apcu_fetch') && function_exists('apcu_store')) {
+    $requestedAt = apcu_fetch("ws_ping_request_$workstation");
+    if ($requestedAt !== false) {
+        $pingRequested = true;
+        apcu_store("ws_ping_ack_$workstation", time(), 120);
+        if (function_exists('apcu_delete')) {
+            apcu_delete("ws_ping_request_$workstation");
+        }
+    }
+}
+
+jsonResponse(['ok' => true, 'ping_requested' => $pingRequested]);

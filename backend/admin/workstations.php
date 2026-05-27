@@ -62,7 +62,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="card-header">
         <h3 class="card-title"><i class="ti ti-device-desktop me-2 text-blue"></i>Registered Workstations</h3>
         <div class="card-options">
-          <button class="btn btn-sm btn-ghost-secondary" onclick="loadWorkstations()">
+          <button class="btn btn-sm btn-ghost-secondary" onclick="refreshWorkstationsWithPing(true)">
             <i class="ti ti-refresh"></i>
           </button>
         </div>
@@ -93,6 +93,8 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+let pingFollowupPoller = null;
+
 async function loadApiKeys() {
   const res  = await fetch('../api/apikeys.php');
   const data = await res.json();
@@ -121,18 +123,63 @@ async function loadWorkstations() {
   const tbody = document.getElementById('ws-tbody');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
   tbody.innerHTML = data.map(w => {
-    const cls = w.status === 'online' ? 'bg-green' : w.status === 'locked' ? 'bg-yellow text-yellow-fg' : 'bg-secondary';
+    const effectiveStatus = w.effective_status || w.status || 'offline';
+    const cls = effectiveStatus === 'online' ? 'bg-green' : effectiveStatus === 'locked' ? 'bg-yellow text-yellow-fg' : 'bg-secondary';
+    const pingBadge = w.ping_state === 'pending'
+      ? '<span class="badge bg-blue-lt text-blue ms-1">pinging</span>'
+      : w.ping_state === 'ack'
+        ? '<span class="badge bg-green-lt text-green ms-1">ping ok</span>'
+        : w.ping_state === 'timeout'
+          ? '<span class="badge bg-red-lt text-red ms-1">no ping</span>'
+          : '';
     return `
       <tr>
         <td class="fw-semibold">${escHtml(w.hostname)}</td>
         <td class="text-muted">${escHtml(w.ip_address || '—')}</td>
-        <td class="text-center"><span class="badge ${cls}">${w.status}</span></td>
+        <td class="text-center"><span class="badge ${cls}">${escHtml(effectiveStatus)}</span>${pingBadge}</td>
         <td>${escHtml(w.current_user || '—')}</td>
         <td class="text-muted small">${escHtml(w.os_version || '—')}</td>
         <td class="text-muted">${escHtml(w.agent_version || '—')}</td>
         <td class="text-muted">${w.last_heartbeat ? fmtDate(w.last_heartbeat, true) : '—'}</td>
       </tr>`;
   }).join('');
+}
+
+async function requestWorkstationPingAll() {
+  const r = await fetch('../api/workstations.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'ping_all' }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || 'Failed to ping workstations');
+  }
+}
+
+function startPingFollowupPolling() {
+  clearInterval(pingFollowupPoller);
+  let attempts = 0;
+  pingFollowupPoller = setInterval(async () => {
+    attempts++;
+    await loadWorkstations();
+    if (attempts >= 12) {
+      clearInterval(pingFollowupPoller);
+    }
+  }, 5000);
+}
+
+async function refreshWorkstationsWithPing(showErrors = false) {
+  try {
+    await requestWorkstationPingAll();
+    await loadWorkstations();
+    startPingFollowupPolling();
+  } catch (err) {
+    await loadWorkstations();
+    if (showErrors) {
+      alert(err.message || 'Failed to refresh workstation status.');
+    }
+  }
 }
 
 async function createApiKey() {
@@ -153,7 +200,8 @@ async function deleteKey(id) {
 }
 
 loadApiKeys();
-loadWorkstations();
+refreshWorkstationsWithPing();
+setInterval(() => refreshWorkstationsWithPing(false), 60000);
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

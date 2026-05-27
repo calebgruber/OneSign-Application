@@ -54,6 +54,11 @@ class PcProxReader:
         self._lib = None
         self._dev_id = ctypes.c_long(0)
         self._connected = False
+        self._usb_connect = None
+        self._usb_disconnect = None
+        self._get_active_id = None
+        self._set_dev_type_srch = None
+        self._set_connect_product = None
 
     # ── Connection ──────────────────────────────────────────────────────
 
@@ -69,14 +74,9 @@ class PcProxReader:
 
         self._declare_functions()
 
-        # Search for HID device (type 0 = pcProx)
-        try:
-            self._lib.SetDevTypeSrch(ctypes.c_ubyte(0))
-            self._lib.SetConnectProduct(ctypes.c_ubyte(0))
-        except AttributeError:
-            pass  # older DLL versions may not have these
+        self._configure_device_search()
 
-        result = self._lib.USBConnect(ctypes.byref(self._dev_id))
+        result = self._call_usb_connect()
         if result != 1:
             raise PcProxError(f"USBConnect failed (returned {result})")
 
@@ -113,9 +113,9 @@ class PcProxReader:
 
     def disconnect(self):
         """Close USB connection and unload DLL."""
-        if self._lib and self._connected:
+        if self._lib and self._connected and self._usb_disconnect is not None:
             try:
-                self._lib.USBDisconnect()
+                self._usb_disconnect()
             except Exception:
                 pass
             self._connected = False
@@ -132,7 +132,7 @@ class PcProxReader:
             return None
 
         buf = (ctypes.c_ubyte * CARD_DATA_LEN)()
-        n = self._lib.GetActiveID(buf, ctypes.c_ubyte(CARD_DATA_LEN))
+        n = self._call_get_active_id(buf)
 
         if n <= 0:
             return None
@@ -157,26 +157,57 @@ class PcProxReader:
         """Set ctypes argtypes/restype for each DLL function."""
         lib = self._lib
 
-        # long USBConnect(long *pDevID)
-        lib.USBConnect.argtypes = [ctypes.POINTER(ctypes.c_long)]
-        lib.USBConnect.restype  = ctypes.c_long
+        self._usb_connect = self._pick_function(('USBConnect', 'usbConnect'))
+        self._usb_disconnect = self._pick_function(('USBDisconnect', 'usbDisconnect'))
+        self._get_active_id = self._pick_function(('GetActiveID', 'getActiveID'))
+        self._set_dev_type_srch = self._pick_function(('SetDevTypeSrch',))
+        self._set_connect_product = self._pick_function(('SetConnectProduct',))
 
-        # void USBDisconnect(void)
-        lib.USBDisconnect.argtypes = []
-        lib.USBDisconnect.restype  = None
+        if self._usb_connect is None or self._usb_disconnect is None or self._get_active_id is None:
+            raise PcProxError("Required pcProx API functions not found in DLL")
 
-        # int GetActiveID(BYTE *pData, BYTE bSize)
-        lib.GetActiveID.argtypes = [
+        self._usb_connect.restype = ctypes.c_short
+        self._usb_disconnect.restype = ctypes.c_short
+        self._get_active_id.argtypes = [
             ctypes.POINTER(ctypes.c_ubyte),
             ctypes.c_ubyte,
         ]
-        lib.GetActiveID.restype = ctypes.c_int
+        self._get_active_id.restype = ctypes.c_int
 
-        # Optional helpers (not all DLL versions have these)
-        for fn in ('SetDevTypeSrch', 'SetConnectProduct'):
-            if hasattr(lib, fn):
-                getattr(lib, fn).argtypes = [ctypes.c_ubyte]
-                getattr(lib, fn).restype  = None
+        if self._set_dev_type_srch is not None:
+            self._set_dev_type_srch.restype = ctypes.c_short
+        if self._set_connect_product is not None:
+            self._set_connect_product.restype = ctypes.c_short
+
+    def _pick_function(self, names: tuple[str, ...]):
+        for name in names:
+            if hasattr(self._lib, name):
+                return getattr(self._lib, name)
+        return None
+
+    def _configure_device_search(self):
+        # Search for USB HID pcProx devices.
+        if self._set_dev_type_srch is not None:
+            try:
+                self._set_dev_type_srch(ctypes.c_short(0))
+            except TypeError:
+                self._set_dev_type_srch(ctypes.c_ubyte(0))
+        if self._set_connect_product is not None:
+            try:
+                self._set_connect_product(ctypes.c_short(0))
+            except TypeError:
+                self._set_connect_product(ctypes.c_ubyte(0))
+
+    def _call_usb_connect(self) -> int:
+        try:
+            self._usb_connect.argtypes = [ctypes.POINTER(ctypes.c_long)]
+            return int(self._usb_connect(ctypes.byref(self._dev_id)))
+        except TypeError:
+            self._usb_connect.argtypes = []
+            return int(self._usb_connect())
+
+    def _call_get_active_id(self, buffer):
+        return int(self._get_active_id(buffer, ctypes.c_ubyte(CARD_DATA_LEN)))
 
     def __enter__(self):
         self.connect()

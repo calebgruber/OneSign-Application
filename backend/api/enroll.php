@@ -30,9 +30,21 @@ if ($method === 'GET') {
 // Admin starts enrollment
 if ($method === 'POST') {
     requireAdminLogin();
-    $data        = json_decode(file_get_contents('php://input'), true) ?? [];
-    $workstation = trim($data['workstation'] ?? '');
-    $userId      = (int)($data['user_id'] ?? 0);
+    $data          = json_decode(file_get_contents('php://input'), true) ?? [];
+    $workstationId = (int)($data['workstation_id'] ?? 0);
+    $workstation   = trim($data['workstation'] ?? '');
+    $userId        = (int)($data['user_id'] ?? 0);
+
+    if ($workstationId > 0) {
+        $ws = db()->prepare('SELECT hostname FROM workstations WHERE id = ?');
+        $ws->execute([$workstationId]);
+        $wsRow = $ws->fetch();
+        if (!$wsRow) {
+            jsonResponse(['error' => 'Selected workstation not found'], 404);
+        }
+        $workstation = (string)$wsRow['hostname'];
+    }
+
     if (!$workstation || !$userId) { jsonResponse(['error' => 'workstation and user_id required'], 400); }
 
     $token = bin2hex(random_bytes(16));
@@ -40,8 +52,9 @@ if ($method === 'POST') {
     if (function_exists('apcu_store')) {
         apcu_store("enroll_pending_$workstation", $token, 300);
         apcu_store("enroll_user_$token", $userId, 300);
+        apcu_store("enroll_workstation_$token", $workstation, 300);
     }
-    jsonResponse(['token' => $token, 'ok' => true]);
+    jsonResponse(['token' => $token, 'ok' => true, 'workstation' => $workstation]);
 }
 
 // Agent submits the tapped card
@@ -55,6 +68,7 @@ if ($method === 'PUT') {
 
     $userId = function_exists('apcu_fetch') ? apcu_fetch("enroll_user_$token") : null;
     if (!$userId) { jsonResponse(['error' => 'Enrollment token expired or not found'], 404); }
+    $workstation = function_exists('apcu_fetch') ? apcu_fetch("enroll_workstation_$token") : null;
 
     // Check if already enrolled
     $existing = db()->prepare('SELECT id FROM cards WHERE card_id=?');
@@ -67,10 +81,14 @@ if ($method === 'PUT') {
 
     if (function_exists('apcu_delete')) {
         apcu_delete("enroll_user_$token");
+        apcu_delete("enroll_workstation_$token");
+        if ($workstation) {
+            apcu_delete("enroll_pending_$workstation");
+        }
     }
 
-    logAudit('card_enrolled', $userId, $cardId, null, getClientIp(), 'Card enrolled via agent');
-    jsonResponse(['id' => (int)$newId, 'card_id' => $cardId, 'ok' => true], 201);
+    logAudit('card_enrolled', $userId, $cardId, $workstation ?: null, getClientIp(), 'Card enrolled via agent');
+    jsonResponse(['id' => (int)$newId, 'card_id' => $cardId, 'ok' => true, 'workstation' => $workstation], 201);
 }
 
 jsonResponse(['error' => 'Method not allowed'], 405);

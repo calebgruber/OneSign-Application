@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/db.php';
 requireAdminLogin();
 $pageTitle = 'Enroll Card';
 $allUsers  = db()->query('SELECT id, username, full_name FROM users WHERE active=1 ORDER BY full_name')->fetchAll();
+$workstations = db()->query('SELECT id, hostname, status, last_heartbeat FROM workstations ORDER BY hostname')->fetchAll();
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -83,8 +84,18 @@ include __DIR__ . '/../includes/header.php';
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label required">Workstation hostname</label>
-              <input type="text" class="form-control" id="liveWorkstation" placeholder="PC-001">
+              <label class="form-label required">Workstation</label>
+              <select class="form-select" id="liveWorkstation">
+                <option value="">— Select Workstation —</option>
+                <?php foreach ($workstations as $ws): ?>
+                <option value="<?= (int)$ws['id'] ?>">
+                  <?= htmlspecialchars($ws['hostname']) ?><?= !empty($ws['status']) ? ' (' . htmlspecialchars($ws['status']) . ')' : '' ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+              <?php if (!$workstations): ?>
+                <div class="form-hint text-warning">No workstations found yet. Open the Workstations page and wait for an agent heartbeat first.</div>
+              <?php endif; ?>
             </div>
             <button class="btn btn-success w-100" onclick="startLiveEnroll()" id="startLiveBtn">
               <i class="ti ti-wifi me-1"></i>Start Live Enrollment
@@ -139,19 +150,21 @@ async function enrollManual() {
 
 async function startLiveEnroll() {
   const userId = document.getElementById('liveUser').value;
-  const ws     = document.getElementById('liveWorkstation').value.trim();
-  if (!userId || !ws) { alert('User and workstation are required.'); return; }
+  const wsId   = parseInt(document.getElementById('liveWorkstation').value, 10);
+  const wsName = document.getElementById('liveWorkstation').selectedOptions[0]?.text || 'selected workstation';
+  if (!userId || !wsId) { alert('User and workstation are required.'); return; }
 
   const r = await fetch('../api/enroll.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: parseInt(userId), workstation: ws }),
+    body: JSON.stringify({ user_id: parseInt(userId, 10), workstation_id: wsId }),
   });
   if (!r.ok) { alert('Failed to start enrollment.'); return; }
 
   document.getElementById('startLiveBtn').classList.add('d-none');
   document.getElementById('liveStatus').classList.remove('d-none');
-  document.getElementById('liveResult').innerHTML = '';
+  document.getElementById('liveResult').innerHTML =
+    `<div class="text-muted small">Waiting for badge tap on <strong>${escHtml(wsName)}</strong>.</div>`;
 
   let attempts = 0;
   livePoller = setInterval(async () => {
