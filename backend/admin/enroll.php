@@ -87,9 +87,13 @@ include __DIR__ . '/../includes/header.php';
               <label class="form-label required">Workstation</label>
               <select class="form-select" id="liveWorkstation">
                 <option value="">— Select Workstation —</option>
-                <?php foreach ($workstations as $ws): ?>
-                <option value="<?= (int)$ws['id'] ?>">
-                  <?= htmlspecialchars($ws['hostname']) ?><?= !empty($ws['status']) ? ' (' . htmlspecialchars($ws['status']) . ')' : '' ?>
+                <?php foreach ($workstations as $ws):
+                  $lastHeartbeatTs = !empty($ws['last_heartbeat']) ? strtotime($ws['last_heartbeat']) : 0;
+                  $isOffline = empty($ws['last_heartbeat']) || ((time() - $lastHeartbeatTs) > 90) || (($ws['status'] ?? '') === 'offline');
+                  $statusLabel = $isOffline ? 'offline' : ($ws['status'] ?? 'online');
+                ?>
+                <option value="<?= (int)$ws['id'] ?>" <?= $isOffline ? 'disabled' : '' ?>>
+                  <?= htmlspecialchars($ws['hostname']) ?> (<?= htmlspecialchars($statusLabel) ?>)<?= $isOffline ? ' — unavailable' : '' ?>
                 </option>
                 <?php endforeach; ?>
               </select>

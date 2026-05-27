@@ -18,6 +18,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Agent polling - API key auth
 if ($method === 'GET') {
     if (!authenticateApiKey()) { jsonResponse(['error' => 'Unauthorized'], 401); }
+    if (!function_exists('apcu_fetch')) { jsonResponse(['error' => 'Enrollment queue unavailable'], 503); }
     // Check if there's a pending enrollment token for this workstation
     $workstation = trim($_GET['workstation'] ?? '');
     if (!$workstation) { jsonResponse(['pending' => false]); }
@@ -30,6 +31,9 @@ if ($method === 'GET') {
 // Admin starts enrollment
 if ($method === 'POST') {
     requireAdminLogin();
+    if (!function_exists('apcu_store') || !function_exists('apcu_fetch')) {
+        jsonResponse(['error' => 'APCu is required for live enrollment'], 503);
+    }
     $data          = json_decode(file_get_contents('php://input'), true) ?? [];
     $workstationId = (int)($data['workstation_id'] ?? 0);
     $workstation   = trim($data['workstation'] ?? '');
@@ -49,26 +53,25 @@ if ($method === 'POST') {
 
     $token = bin2hex(random_bytes(16));
     // Store enrollment request (APCu for 5 minutes)
-    if (function_exists('apcu_store')) {
-        apcu_store("enroll_pending_$workstation", $token, 300);
-        apcu_store("enroll_user_$token", $userId, 300);
-        apcu_store("enroll_workstation_$token", $workstation, 300);
-    }
+    apcu_store("enroll_pending_$workstation", $token, 300);
+    apcu_store("enroll_user_$token", $userId, 300);
+    apcu_store("enroll_workstation_$token", $workstation, 300);
     jsonResponse(['token' => $token, 'ok' => true, 'workstation' => $workstation]);
 }
 
 // Agent submits the tapped card
 if ($method === 'PUT') {
     if (!authenticateApiKey()) { jsonResponse(['error' => 'Unauthorized'], 401); }
+    if (!function_exists('apcu_fetch')) { jsonResponse(['error' => 'Enrollment queue unavailable'], 503); }
     $data   = json_decode(file_get_contents('php://input'), true) ?? [];
     $token  = trim($data['token'] ?? '');
     $cardId = strtoupper(trim($data['card_id'] ?? ''));
 
     if (!$token || !$cardId) { jsonResponse(['error' => 'token and card_id required'], 400); }
 
-    $userId = function_exists('apcu_fetch') ? apcu_fetch("enroll_user_$token") : null;
+    $userId = apcu_fetch("enroll_user_$token");
     if (!$userId) { jsonResponse(['error' => 'Enrollment token expired or not found'], 404); }
-    $workstation = function_exists('apcu_fetch') ? apcu_fetch("enroll_workstation_$token") : null;
+    $workstation = apcu_fetch("enroll_workstation_$token");
 
     // Check if already enrolled
     $existing = db()->prepare('SELECT id FROM cards WHERE card_id=?');
