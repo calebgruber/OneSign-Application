@@ -6,6 +6,9 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 $adminName = $_SESSION['admin_name'] ?? 'Admin';
 $adminRole = $_SESSION['admin_role'] ?? 'admin';
 $currentPage = basename($_SERVER['PHP_SELF']);
+$appBasePath = function_exists('appBasePath') ? appBasePath() : '';
+$adminBasePath = $appBasePath . '/admin';
+$assetBasePath = $appBasePath . '/assets';
 
 function navItem(string $href, string $icon, string $label, string $current): string {
     $active = $current === basename($href) ? ' active' : '';
@@ -23,7 +26,7 @@ function navItem(string $href, string $icon, string $label, string $current): st
   <title>OneSign &mdash; <?= htmlspecialchars($pageTitle) ?></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
-  <link rel="stylesheet" href="/assets/css/onesign.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($assetBasePath) ?>/css/onesign.css">
 </head>
 <body class="antialiased">
 <div class="wrapper">
@@ -37,8 +40,8 @@ function navItem(string $href, string $icon, string $label, string $current): st
 
     <!-- Brand -->
     <h1 class="navbar-brand navbar-brand-autodark">
-      <a href="/admin/index.php" class="d-flex align-items-center gap-2 text-white text-decoration-none">
-        <img src="/assets/img/logo.svg" height="32" alt="OneSign" class="navbar-brand-image">
+      <a href="<?= htmlspecialchars($adminBasePath) ?>/index.php" class="d-flex align-items-center gap-2 text-white text-decoration-none">
+        <img src="<?= htmlspecialchars($assetBasePath) ?>/img/logo.svg" height="32" alt="OneSign" class="navbar-brand-image">
         <span class="fw-bold fs-5">OneSign</span>
       </a>
     </h1>
@@ -52,7 +55,7 @@ function navItem(string $href, string $icon, string $label, string $current): st
           </div>
         </a>
         <div class="dropdown-menu dropdown-menu-end">
-          <a class="dropdown-item" href="/admin/logout.php"><i class="ti ti-logout me-2"></i>Sign out</a>
+          <a class="dropdown-item" href="<?= htmlspecialchars($adminBasePath) ?>/logout.php"><i class="ti ti-logout me-2"></i>Sign out</a>
         </div>
       </div>
     </div>
@@ -60,13 +63,13 @@ function navItem(string $href, string $icon, string $label, string $current): st
     <!-- Nav links -->
     <div class="collapse navbar-collapse" id="sidebar-menu">
       <ul class="navbar-nav pt-lg-3">
-        <li class="nav-item"><?= navItem('/admin/index.php',        'ti-dashboard',       'Dashboard',    $currentPage) ?></li>
-        <li class="nav-item"><?= navItem('/admin/users.php',        'ti-users',           'Users',        $currentPage) ?></li>
-        <li class="nav-item"><?= navItem('/admin/cards.php',        'ti-id-badge',        'Cards',        $currentPage) ?></li>
-        <li class="nav-item"><?= navItem('/admin/enroll.php',       'ti-user-plus',       'Enroll',       $currentPage) ?></li>
-        <li class="nav-item"><?= navItem('/admin/audit.php',        'ti-file-analytics',  'Audit Log',    $currentPage) ?></li>
-        <li class="nav-item"><?= navItem('/admin/workstations.php', 'ti-device-desktop',  'Workstations', $currentPage) ?></li>
-        <li class="nav-item mt-2 border-top pt-2"><?= navItem('/admin/settings.php', 'ti-settings', 'Settings', $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/index.php',        'ti-dashboard',       'Dashboard',    $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/users.php',        'ti-users',           'Users',        $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/cards.php',        'ti-id-badge',        'Cards',        $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/enroll.php',       'ti-user-plus',       'Enroll',       $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/audit.php',        'ti-file-analytics',  'Audit Log',    $currentPage) ?></li>
+        <li class="nav-item"><?= navItem($adminBasePath . '/workstations.php', 'ti-device-desktop',  'Workstations', $currentPage) ?></li>
+        <li class="nav-item mt-2 border-top pt-2"><?= navItem($adminBasePath . '/settings.php', 'ti-settings', 'Settings', $currentPage) ?></li>
       </ul>
 
       <!-- Bottom user info (desktop) -->
@@ -79,7 +82,7 @@ function navItem(string $href, string $icon, string $label, string $current): st
             <div class="text-white small fw-semibold text-truncate"><?= htmlspecialchars($adminName) ?></div>
             <div class="text-white-50 small"><?= htmlspecialchars($adminRole) ?></div>
           </div>
-          <a href="/admin/logout.php" class="btn btn-ghost-light btn-sm btn-icon" title="Sign out">
+          <a href="<?= htmlspecialchars($adminBasePath) ?>/logout.php" class="btn btn-ghost-light btn-sm btn-icon" title="Sign out">
             <i class="ti ti-logout"></i>
           </a>
         </div>

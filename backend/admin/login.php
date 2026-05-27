@@ -5,8 +5,12 @@
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../includes/db.php';
 
+$appBasePath = appBasePath();
+$adminBasePath = $appBasePath . '/admin';
+$assetBasePath = $appBasePath . '/assets';
+
 if (isAdminLoggedIn()) {
-    header('Location: /admin/index.php');
+    header('Location: ' . $adminBasePath . '/index.php');
     exit;
 }
 
@@ -26,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['admin_name'] = $admin['full_name'];
         $_SESSION['admin_role'] = $admin['role'];
         db()->prepare('UPDATE admin_users SET last_login=NOW() WHERE id=?')->execute([$admin['id']]);
-        header('Location: /admin/index.php');
+        header('Location: ' . $adminBasePath . '/index.php');
         exit;
     }
     $error = 'Invalid username or password.';
@@ -40,13 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <title>OneSign &mdash; Admin Login</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="/assets/css/onesign.css">
+<link rel="stylesheet" href="<?= htmlspecialchars($assetBasePath) ?>/css/onesign.css">
 </head>
 <body class="antialiased d-flex flex-column" style="min-height:100vh; background:var(--tblr-body-bg)">
 <div class="page page-center">
   <div class="container container-tight py-4">
     <div class="text-center mb-4">
-      <img src="/assets/img/logo.svg" alt="OneSign" height="56" class="mb-3">
+      <img src="<?= htmlspecialchars($assetBasePath) ?>/img/logo.svg" alt="OneSign" height="56" class="mb-3">
       <h2 class="fw-bold">OneSign Admin</h2>
       <p class="text-muted">Sign in to manage your OneSign deployment</p>
     </div>

@@ -19,9 +19,16 @@ function isAdminLoggedIn(): bool {
     return !empty($_SESSION['admin_id']) && !empty($_SESSION['admin_user']);
 }
 
+function appBasePath(): string {
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    $scriptDir = str_replace('\\', '/', dirname($scriptName));
+    $base = str_replace('\\', '/', dirname($scriptDir));
+    return ($base === '/' || $base === '.' || $base === '\\') ? '' : rtrim($base, '/');
+}
+
 function requireAdminLogin(): void {
     if (!isAdminLoggedIn()) {
-        header('Location: /admin/login.php');
+        header('Location: ' . appBasePath() . '/admin/login.php');
         exit;
     }
 }
