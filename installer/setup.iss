@@ -25,6 +25,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+ArchitecturesInstallIn64BitMode=x64compatible
 ; Show a wizard page asking for server URL and API key
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
@@ -51,6 +52,10 @@ Source: "pcProxAPI.dll";   DestDir: "{app}"; Flags: ignoreversion; Check: not Is
 ; NSSM service manager
 Source: "nssm.exe"; DestDir: "{app}"; Flags: ignoreversion
 
+; Service scripts
+Source: "..\agent\install_service.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\agent\uninstall_service.bat"; DestDir: "{app}"; Flags: ignoreversion
+
 ; Default config (will be filled from the wizard)
 Source: "..\agent\config.ini"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
@@ -65,6 +70,7 @@ Name: "{userdesktop}\OneSign Agent"; Filename: "{app}\{#AppExeName}"; Tasks: des
 [Run]
 ; Install and start the Windows service after installation
 Filename: "{app}\install_service.bat"; Flags: runhidden waituntilterminated; Tasks: installservice; Description: "Install OneSign Windows service"
+Filename: "{app}\{#AppExeName}"; Description: "Launch OneSign Agent"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{app}\uninstall_service.bat"; Flags: runhidden waituntilterminated
@@ -90,7 +96,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ConfigFile: string;
-  ServerURL, ApiKey: string;
+  ServerURL, ApiKey, ReaderDllPath: string;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -102,6 +108,12 @@ begin
     begin
       SetIniString('server', 'url', ServerURL, ConfigFile);
       SetIniString('server', 'api_key', ApiKey, ConfigFile);
+
+      if Is64BitInstallMode then
+        ReaderDllPath := ExpandConstant('{app}\pcProxAPI64.dll')
+      else
+        ReaderDllPath := ExpandConstant('{app}\pcProxAPI.dll');
+      SetIniString('reader', 'dll_path', ReaderDllPath, ConfigFile);
     end;
   end;
 end;

@@ -195,7 +195,8 @@ Output: `agent\dist\OneSignAgent.exe`
 
 1. Install [Inno Setup 6](https://jrsoftware.org/issetup.php).
 2. Copy required files to `installer\`:
-   - `pcProxAPI64.dll` (from RF Ideas SDK)
+   - `pcProxAPI64.dll` (from RF Ideas SDK, required on 64-bit installs)
+   - `pcProxAPI.dll` (from RF Ideas SDK, required on 32-bit installs)
    - `nssm.exe` (from [nssm.cc](https://nssm.cc))
 3. Build the EXE first (see above).
 4. Run:

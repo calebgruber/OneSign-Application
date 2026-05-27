@@ -2,7 +2,8 @@
 REM install_service.bat — Install OneSign Agent as a Windows service using NSSM
 REM Run as Administrator.
 
-SET INSTALL_DIR=C:\Program Files\OneSign Agent
+SET "INSTALL_DIR=%~dp0"
+IF "%INSTALL_DIR:~-1%"=="\" SET "INSTALL_DIR=%INSTALL_DIR:~0,-1%"
 SET NSSM=%INSTALL_DIR%\nssm.exe
 SET EXE=%INSTALL_DIR%\OneSignAgent.exe
 SET SVC_NAME=OneSignAgent
