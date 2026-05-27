@@ -58,7 +58,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 async function loadAudit() {
-  const res  = await fetch('/api/audit.php?limit=500');
+  const res  = await fetch('../api/audit.php?limit=500');
   const data = await res.json();
   const tbody = document.getElementById('audit-tbody');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No events found.</td></tr>'; return; }

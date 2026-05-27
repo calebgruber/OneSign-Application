@@ -94,7 +94,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 async function loadApiKeys() {
-  const res  = await fetch('/api/apikeys.php');
+  const res  = await fetch('../api/apikeys.php');
   const data = await res.json();
   const tbody = document.getElementById('keys-tbody');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No API keys. Generate one above.</td></tr>'; return; }
@@ -116,7 +116,7 @@ async function loadApiKeys() {
 }
 
 async function loadWorkstations() {
-  const res  = await fetch('/api/workstations.php');
+  const res  = await fetch('../api/workstations.php');
   const data = await res.json();
   const tbody = document.getElementById('ws-tbody');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
@@ -138,7 +138,7 @@ async function loadWorkstations() {
 async function createApiKey() {
   const label = prompt('Label for this API key (e.g. workstation name):');
   if (!label) return;
-  const r = await fetch('/api/apikeys.php', {
+  const r = await fetch('../api/apikeys.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ label }),
@@ -148,7 +148,7 @@ async function createApiKey() {
 
 async function deleteKey(id) {
   if (!confirm('Revoke this API key? Agents using it will stop working.')) return;
-  await fetch(`/api/apikeys.php?id=${id}`, { method: 'DELETE' });
+  await fetch(`../api/apikeys.php?id=${id}`, { method: 'DELETE' });
   loadApiKeys();
 }
 

@@ -122,7 +122,7 @@ async function enrollManual() {
   const label  = document.getElementById('manualLabel').value.trim();
   if (!userId || !cardId) { alert('User and Card ID are required.'); return; }
 
-  const r   = await fetch('/api/cards.php', {
+  const r   = await fetch('../api/cards.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: parseInt(userId), card_id: cardId, card_label: label || 'Badge Card' }),
@@ -142,7 +142,7 @@ async function startLiveEnroll() {
   const ws     = document.getElementById('liveWorkstation').value.trim();
   if (!userId || !ws) { alert('User and workstation are required.'); return; }
 
-  const r = await fetch('/api/enroll.php', {
+  const r = await fetch('../api/enroll.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: parseInt(userId), workstation: ws }),
@@ -157,7 +157,7 @@ async function startLiveEnroll() {
   livePoller = setInterval(async () => {
     attempts++;
     if (attempts > 30) { cancelLiveEnroll(); return; }
-    const evRes = await fetch('/api/audit.php?type=card_enrolled&limit=3');
+    const evRes = await fetch('../api/audit.php?type=card_enrolled&limit=3');
     const events = await evRes.json();
     if (events.length && (Date.now() - new Date(events[0].created_at).getTime()) < 15000) {
       clearInterval(livePoller);
