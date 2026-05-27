@@ -78,7 +78,7 @@ Name: "{userdesktop}\Stop OneSign Service";  Filename: "{sys}\cmd.exe"; Paramete
 [Run]
 ; Install and start the Windows service after installation
 Filename: "{app}\install_service.bat"; Flags: runhidden waituntilterminated; Tasks: installservice; Description: "Install OneSign Windows service"
-Filename: "{app}\{#AppExeName}"; Description: "Launch OneSign Agent"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "Launch OneSign Agent"; Flags: nowait postinstall skipifsilent; Check: not WizardIsTaskSelected('installservice')
 
 [UninstallRun]
 Filename: "{app}\uninstall_service.bat"; Flags: runhidden waituntilterminated
