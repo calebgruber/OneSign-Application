@@ -186,10 +186,10 @@ No build step needed — PHP files are deployed directly.
 
 ```cmd
 cd agent
-pip install -r requirements.txt
 build.bat
 ```
 Output: `agent\dist\OneSignAgent.exe`
+`build.bat` installs dependencies with `python -m pip`/`py -3 -m pip` and builds via `-m PyInstaller`, so `pyinstaller.exe` does not need to be on PATH.
 
 ### Installer
 
