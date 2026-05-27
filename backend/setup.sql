@@ -132,7 +132,10 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('require_https', '0', 'Require HTTPS for agent connections'),
 ('encryption_key', '', 'Server-side encryption key (auto-generated)'),
 ('allow_password_fallback', '1', 'Allow username/password login as fallback'),
-('enrollment_mode', 'admin', 'Who can enroll cards: admin or user')
+('enrollment_mode', 'admin', 'Who can enroll cards: admin or user'),
+('credential_provider_enabled', '0', 'Use external credential provider helper for workstation unlocks'),
+('credential_provider_command', '', 'Command to invoke credential provider helper (receives JSON on stdin)'),
+('credential_provider_timeout_seconds', '20', 'Max seconds to wait for credential provider helper process')
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
 
 -- Generate a default API key

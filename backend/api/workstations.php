@@ -53,7 +53,7 @@ try {
 
     if ($status) {
         $stmt = $pdo->prepare(
-            'SELECT w.*, u.full_name AS current_user
+            'SELECT w.*, u.full_name AS `current_user`
              FROM workstations w
              LEFT JOIN users u ON w.current_user_id = u.id
              WHERE (w.hostname LIKE ? OR w.ip_address LIKE ?) AND w.status=?
@@ -62,7 +62,7 @@ try {
         $stmt->execute([$search, $search, $status]);
     } else {
         $stmt = $pdo->prepare(
-            'SELECT w.*, u.full_name AS current_user
+            'SELECT w.*, u.full_name AS `current_user`
              FROM workstations w
              LEFT JOIN users u ON w.current_user_id = u.id
              WHERE w.hostname LIKE ? OR w.ip_address LIKE ?

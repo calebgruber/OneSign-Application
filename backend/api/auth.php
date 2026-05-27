@@ -106,7 +106,10 @@ jsonResponse([
     ],
     'credentials' => $credentials,
     'settings' => [
-        'lock_on_remove'      => (bool)(int)getSetting('lock_on_remove', '1'),
-        'lock_delay_seconds'  => (int)getSetting('lock_delay_seconds', '5'),
+        'lock_on_remove'                     => (bool)(int)getSetting('lock_on_remove', '1'),
+        'lock_delay_seconds'                 => (int)getSetting('lock_delay_seconds', '5'),
+        'credential_provider_enabled'        => (bool)(int)getSetting('credential_provider_enabled', '0'),
+        'credential_provider_command'        => getSetting('credential_provider_command', ''),
+        'credential_provider_timeout_seconds'=> (int)getSetting('credential_provider_timeout_seconds', '20'),
     ],
 ]);

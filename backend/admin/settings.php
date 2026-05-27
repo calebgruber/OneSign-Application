@@ -9,7 +9,7 @@ $pageTitle = 'Settings';
 
 $saved = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $keys = ['app_name','lock_on_remove','lock_delay_seconds','session_timeout_minutes','allow_password_fallback','enrollment_mode'];
+    $keys = ['app_name','lock_on_remove','lock_delay_seconds','session_timeout_minutes','allow_password_fallback','enrollment_mode','credential_provider_enabled','credential_provider_command','credential_provider_timeout_seconds'];
     foreach ($keys as $k) {
         if (isset($_POST[$k])) {
             db()->prepare('UPDATE settings SET setting_value=? WHERE setting_key=?')->execute([$_POST[$k], $k]);
@@ -145,6 +145,42 @@ include __DIR__ . '/../includes/header.php';
         </div>
       </div>
       <?php endif; ?>
+
+      <!-- Credential Provider -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="ti ti-plug me-2 text-blue"></i>Credential Provider</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              When enabled, the agent invokes an external helper process to unlock the workstation instead of
+              sending keystrokes directly. The helper receives a JSON payload on stdin
+              (<code>{"username":"…","password":"…","domain":"…"}</code>) and must exit with code&nbsp;0 on success.
+            </p>
+            <div class="mb-3">
+              <label class="form-check form-switch">
+                <input type="hidden" name="credential_provider_enabled" value="0">
+                <input class="form-check-input" type="checkbox" name="credential_provider_enabled" value="1" id="cpEnabled"
+                  <?= ($s['credential_provider_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span class="form-check-label">Enable external credential provider helper</span>
+              </label>
+            </div>
+            <div class="mb-3" style="max-width:600px">
+              <label class="form-label">Helper Command</label>
+              <input type="text" name="credential_provider_command" class="form-control font-monospace"
+                placeholder="e.g. C:\OneSign\cp_helper.exe"
+                value="<?= htmlspecialchars($s['credential_provider_command'] ?? '') ?>">
+              <div class="form-hint">Full path to the credential provider helper executable.</div>
+            </div>
+            <div style="max-width:200px">
+              <label class="form-label">Helper timeout (seconds)</label>
+              <input type="number" name="credential_provider_timeout_seconds" class="form-control" min="1" max="120"
+                value="<?= (int)($s['credential_provider_timeout_seconds'] ?? 20) ?>">
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
 
