@@ -27,6 +27,7 @@ function navItem(string $href, string $icon, string $label, string $current): st
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($assetBasePath) ?>/css/onesign.css">
+  <script src="<?= htmlspecialchars($assetBasePath) ?>/js/admin.js"></script>
 </head>
 <body class="antialiased">
 <div class="wrapper">
