@@ -60,12 +60,20 @@ Source: "..\agent\uninstall_service.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\agent\config.ini"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
 ; Logo / icon
-Source: "..\backend\assets\img\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\backend\assets\img\logo.ico";  DestDir: "{app}"; Flags: ignoreversion
+
+; Service shortcut icons
+Source: "..\backend\assets\img\start.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\backend\assets\img\stop.ico";  DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\OneSign Agent (Admin Panel)"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\OneSign Agent"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+
+; Service control shortcuts — RunAsAdmin flag set in [Code] CurStepChanged(ssDone)
+Name: "{userdesktop}\Start OneSign Service"; Filename: "{sys}\cmd.exe"; Parameters: "/K net start OneSignAgent"; WorkingDir: "{app}"; IconFilename: "{app}\start.ico"
+Name: "{userdesktop}\Stop OneSign Service";  Filename: "{sys}\cmd.exe"; Parameters: "/K net stop OneSignAgent";  WorkingDir: "{app}"; IconFilename: "{app}\stop.ico"
 
 [Run]
 ; Install and start the Windows service after installation
@@ -75,9 +83,29 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch OneSign Agent"; Flags: now
 [UninstallRun]
 Filename: "{app}\uninstall_service.bat"; Flags: runhidden waituntilterminated
 
+[UninstallDelete]
+; Remove the service control shortcuts from the desktop on uninstall
+Type: files; Name: "{userdesktop}\Start OneSign Service.lnk"
+Type: files; Name: "{userdesktop}\Stop OneSign Service.lnk"
+
 [Code]
 var
   ServerURLPage: TInputQueryWizardPage;
+
+// Sets the "Run as administrator" flag (byte 0x15, bit 0x20) on a .lnk file.
+procedure SetShortcutRunAsAdmin(const LinkFile: string);
+var
+  FileContents: AnsiString;
+begin
+  if LoadStringFromFile(LinkFile, FileContents) then
+  begin
+    if Length(FileContents) > $15 then
+    begin
+      FileContents[$15 + 1] := Chr(Ord(FileContents[$15 + 1]) or $20);
+      SaveStringToFile(LinkFile, FileContents, False);
+    end;
+  end;
+end;
 
 procedure InitializeWizard();
 begin
@@ -115,6 +143,13 @@ begin
         ReaderDllPath := ExpandConstant('{app}\pcProxAPI.dll');
       SetIniString('reader', 'dll_path', ReaderDllPath, ConfigFile);
     end;
+  end;
+
+  // Apply RunAsAdmin flag to the service control shortcuts once all files are in place
+  if CurStep = ssDone then
+  begin
+    SetShortcutRunAsAdmin(ExpandConstant('{userdesktop}\Start OneSign Service.lnk'));
+    SetShortcutRunAsAdmin(ExpandConstant('{userdesktop}\Stop OneSign Service.lnk'));
   end;
 end;
 
