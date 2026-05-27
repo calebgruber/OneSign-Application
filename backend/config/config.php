@@ -13,7 +13,7 @@ define('DB_HOST', 'localhost');
 define('DB_PORT', 3306);
 define('DB_NAME', 'onesign');
 define('DB_USER', 'onesign_user');
-define('DB_PASS', 'ChangeMe!SecurePass123');
+define('DB_PASS', 'CHANGE_ME_DB_PASSWORD');
 define('DB_CHARSET', 'utf8mb4');
 
 // Security
@@ -21,7 +21,7 @@ define('SESSION_LIFETIME', 3600 * 8); // 8 hours
 define('API_RATE_LIMIT', 60);         // requests per minute
 
 // Encryption key for Windows credentials (change this to a random 32-char string!)
-define('CREDENTIAL_ENC_KEY', 'CHANGE_THIS_KEY_TO_RANDOM_32CHARS');
+define('CREDENTIAL_ENC_KEY', 'CHANGE_THIS_32_CHAR_RANDOM_KEYXX');
 
 // Paths
 define('ROOT_PATH', dirname(__DIR__));

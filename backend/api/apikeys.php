@@ -1,6 +1,6 @@
 <?php
 /**
- * API Keys management — GET / POST / DELETE
+ * API Keys management — GET / POST / DELETE / PATCH
  * Requires admin session (super admin for create/delete).
  */
 require_once __DIR__ . '/../includes/auth_check.php';
@@ -13,8 +13,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // ── GET  /api/apikeys.php ────────────────────────────────────────────────────
 if ($method === 'GET') {
     $keys = $pdo->query(
-        "SELECT id, key_name, api_key, workstation_hostname, active, created_at,
-                (SELECT MAX(created_at) FROM audit_log WHERE details LIKE CONCAT('%', api_key, '%')) AS last_used
+        "SELECT id, label, api_key, workstation, active, created_at, last_used
          FROM api_keys ORDER BY created_at DESC"
     )->fetchAll();
 
@@ -33,24 +32,24 @@ if ($method === 'POST') {
     requireSuperAdmin();
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-    $keyName  = trim($body['key_name'] ?? '');
-    $hostname = trim($body['workstation_hostname'] ?? '');
+    $label    = trim($body['label'] ?? '');
+    $hostname = trim($body['workstation'] ?? '');
 
-    if (!$keyName) {
+    if (!$label) {
         http_response_code(400);
-        jsonResponse(['error' => 'key_name is required.']);
+        jsonResponse(['error' => 'label is required.']);
     }
 
     // Generate a cryptographically random API key
     $newKey = bin2hex(random_bytes(32));          // 64-char hex string
 
     $stmt = $pdo->prepare(
-        'INSERT INTO api_keys (key_name, api_key, workstation_hostname, active) VALUES (?,?,?,1)'
+        'INSERT INTO api_keys (label, api_key, workstation, active) VALUES (?,?,?,1)'
     );
-    $stmt->execute([$keyName, $newKey, $hostname ?: null]);
+    $stmt->execute([$label, $newKey, $hostname ?: null]);
 
-    logAudit(null, null, null, 'api_key_created', "Key '{$keyName}' created");
-    jsonResponse(['id' => $pdo->lastInsertId(), 'api_key' => $newKey, 'key_name' => $keyName]);
+    logAudit('api_key_created', null, null, $hostname ?: null, getClientIp(), "Key '{$label}' created");
+    jsonResponse(['id' => $pdo->lastInsertId(), 'api_key' => $newKey, 'label' => $label]);
 }
 
 // ── DELETE /api/apikeys.php?id=X ────────────────────────────────────────────
@@ -59,14 +58,14 @@ if ($method === 'DELETE') {
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) { http_response_code(400); jsonResponse(['error' => 'id required']); }
 
-    $key = $pdo->prepare('SELECT key_name FROM api_keys WHERE id=?');
+    $key = $pdo->prepare('SELECT label FROM api_keys WHERE id=?');
     $key->execute([$id]);
     $row = $key->fetch();
 
     if (!$row) { http_response_code(404); jsonResponse(['error' => 'Not found']); }
 
     $pdo->prepare('DELETE FROM api_keys WHERE id=?')->execute([$id]);
-    logAudit(null, null, null, 'api_key_deleted', "Key '{$row['key_name']}' deleted");
+    logAudit('api_key_deleted', null, null, null, getClientIp(), "Key '{$row['label']}' deleted");
     jsonResponse(['success' => true]);
 }
 

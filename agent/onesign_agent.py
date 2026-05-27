@@ -203,8 +203,8 @@ class OneSignAgent:
         url = self.config.get("server", "url").rstrip("/") + "/api/auth.php"
         try:
             resp = self._session.post(url, json={
-                "card_id":   card_hex,
-                "hostname":  HOSTNAME,
+                "card_id":    card_hex,
+                "workstation": HOSTNAME,
             })
         except requests.RequestException as exc:
             logger.error("Auth request failed: %s", exc)
@@ -214,10 +214,11 @@ class OneSignAgent:
 
         if resp.status_code == 200:
             data = resp.json()
-            username = data.get("username", "")
-            password = data.get("password", "")
-            domain   = data.get("domain", ".")
-            fullname = data.get("full_name", username)
+            creds    = data.get("credentials") or {}
+            username = creds.get("username", "")
+            password = creds.get("password", "")
+            domain   = creds.get("domain", ".")
+            fullname = data.get("user", {}).get("full_name", username)
 
             logger.info("Auth success: %s", username)
             self.tray.notify(

@@ -28,8 +28,8 @@ $rows = $stmt->fetchAll();
 
 // Add human-readable last_seen
 foreach ($rows as &$r) {
-    $r['last_seen_relative'] = $r['last_seen']
-        ? human_time_diff($r['last_seen'])
+    $r['last_seen_relative'] = $r['last_heartbeat']
+        ? human_time_diff($r['last_heartbeat'])
         : 'Never';
 }
 
