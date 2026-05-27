@@ -35,7 +35,12 @@ else:
 sys.path.insert(0, str(_BASE))
 
 from pcprox    import PcProxReader, PcProxError
-from win_login import lock_workstation, unlock_workstation, is_workstation_locked
+from win_login import (
+    lock_workstation,
+    unlock_workstation,
+    unlock_with_credential_provider,
+    is_workstation_locked,
+)
 from tray_app  import TrayApp
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
@@ -104,6 +109,11 @@ DEFAULT_CONFIG = {
         "lock_delay_seconds": "5",
         "reconnect_delay_s":  "10",
         "heartbeat_interval": "30",
+    },
+    "credential_provider": {
+        "enabled": "false",
+        "command": "",
+        "timeout_seconds": "20",
     },
 }
 
@@ -374,7 +384,29 @@ class OneSignAgent:
             )
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
-            ok = unlock_workstation(username, password, domain)
+            use_credential_provider = self.config.getboolean(
+                "credential_provider", "enabled", fallback=False
+            )
+            if use_credential_provider:
+                provider_command = self.config.get(
+                    "credential_provider", "command", fallback=""
+                )
+                provider_timeout = self.config.getint(
+                    "credential_provider", "timeout_seconds", fallback=20
+                )
+                ok = unlock_with_credential_provider(
+                    provider_command,
+                    username,
+                    password,
+                    domain,
+                    provider_timeout,
+                )
+                if not ok:
+                    logger.warning("Credential provider unlock failed, falling back to secure desktop SendInput flow")
+                    ok = unlock_workstation(username, password, domain)
+            else:
+                ok = unlock_workstation(username, password, domain)
+
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)
         elif resp.status_code == 401:

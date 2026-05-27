@@ -162,6 +162,9 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[behavior] lock_on_remove` | `true` | Lock on badge removal |
 | `[behavior] lock_delay_seconds` | `5` | Seconds before locking |
 | `[behavior] heartbeat_interval` | `30` | Heartbeat period (seconds) |
+| `[credential_provider] enabled` | `false` | Use external credential provider helper for unlocks |
+| `[credential_provider] command` | *(empty)* | Command to invoke helper (receives JSON creds on stdin) |
+| `[credential_provider] timeout_seconds` | `20` | Helper process timeout in seconds |
 
 ### `backend/config/config.php`
 

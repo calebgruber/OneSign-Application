@@ -95,11 +95,22 @@ include __DIR__ . '/../includes/header.php';
 <script>
 let pingFollowupPoller = null;
 
+async function parseJsonResponse(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid server response (HTTP ${res.status})`);
+  }
+}
+
 async function loadApiKeys() {
   const res  = await fetch('../api/apikeys.php');
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(data.error || `Failed to load API keys (HTTP ${res.status})`);
   const tbody = document.getElementById('keys-tbody');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No API keys. Generate one above.</td></tr>'; return; }
+  if (!Array.isArray(data) || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No API keys. Generate one above.</td></tr>'; return; }
   tbody.innerHTML = data.map(k => `
     <tr>
       <td class="fw-semibold">${escHtml(k.label)}</td>
@@ -119,9 +130,12 @@ async function loadApiKeys() {
 
 async function loadWorkstations() {
   const res  = await fetch('../api/workstations.php');
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
   const tbody = document.getElementById('ws-tbody');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to load workstations (HTTP ${res.status})`);
+  }
+  if (!Array.isArray(data) || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
   tbody.innerHTML = data.map(w => {
     const effectiveStatus = w.effective_status || w.status || 'offline';
     const cls = effectiveStatus === 'online' ? 'bg-green' : effectiveStatus === 'locked' ? 'bg-yellow text-yellow-fg' : 'bg-secondary';
@@ -151,10 +165,9 @@ async function requestWorkstationPingAll() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'ping_all' }),
   });
-  if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error || 'Failed to ping workstations');
-  }
+  const payload = await parseJsonResponse(r);
+  if (!r.ok) throw new Error(payload.error || `Failed to ping workstations (HTTP ${r.status})`);
+  return payload;
 }
 
 function startPingFollowupPolling() {
@@ -171,11 +184,21 @@ function startPingFollowupPolling() {
 
 async function refreshWorkstationsWithPing(showErrors = false) {
   try {
-    await requestWorkstationPingAll();
+    const pingResponse = await requestWorkstationPingAll();
     await loadWorkstations();
     startPingFollowupPolling();
+    if (showErrors && pingResponse && pingResponse.ping_supported === false) {
+      alert(pingResponse.message || 'APCu is not available, so real-time ping checks are disabled.');
+    }
   } catch (err) {
-    await loadWorkstations();
+    try {
+      await loadWorkstations();
+    } catch (loadErr) {
+      if (showErrors) {
+        alert(loadErr.message || 'Failed to load workstation status.');
+      }
+      return;
+    }
     if (showErrors) {
       alert(err.message || 'Failed to refresh workstation status.');
     }
@@ -190,7 +213,8 @@ async function createApiKey() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ label }),
   });
-  if (r.ok) loadApiKeys(); else alert('Failed to create key.');
+  const payload = await parseJsonResponse(r).catch(() => ({}));
+  if (r.ok) loadApiKeys(); else alert(payload.error || 'Failed to create key.');
 }
 
 async function deleteKey(id) {

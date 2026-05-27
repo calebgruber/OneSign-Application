@@ -20,7 +20,9 @@ the standard Windows Logon UI is present.
 
 import ctypes
 import ctypes.wintypes
+import json
 import logging
+import shlex
 import subprocess
 import time
 
@@ -179,6 +181,53 @@ def unlock_workstation(username: str, password: str, domain: str = '.') -> bool:
     except Exception as exc:
         logger.error("unlock_workstation error: %s", exc, exc_info=True)
         return False
+
+
+def unlock_with_credential_provider(
+    provider_command: str,
+    username: str,
+    password: str,
+    domain: str = '.',
+    timeout_seconds: int = 20,
+) -> bool:
+    """
+    Unlock workstation by invoking an external credential provider helper.
+
+    The helper is expected to read a JSON payload from stdin and return exit
+    code 0 on success.
+    """
+    cmd = (provider_command or '').strip()
+    if not cmd:
+        logger.warning("Credential provider command is empty")
+        return False
+
+    try:
+        result = subprocess.run(
+            shlex.split(cmd, posix=False),
+            input=json.dumps({
+                "username": username,
+                "password": password,
+                "domain": domain,
+            }),
+            text=True,
+            capture_output=True,
+            timeout=max(1, int(timeout_seconds)),
+            check=False,
+        )
+    except Exception as exc:
+        logger.error("Credential provider invocation failed: %s", exc)
+        return False
+
+    if result.returncode == 0:
+        logger.info("Credential provider unlock succeeded for user '%s'", username)
+        return True
+
+    logger.warning(
+        "Credential provider unlock failed (code=%s): %s",
+        result.returncode,
+        (result.stderr or result.stdout or '').strip()[:300],
+    )
+    return False
 
 
 def sign_in_new_session(username: str, password: str, domain: str = '.') -> bool:
