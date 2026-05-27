@@ -36,11 +36,24 @@ from tray_app  import TrayApp
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 
+def _is_elevated() -> bool:
+    try:
+        import ctypes
+
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
 def _build_log_file_handler() -> tuple[logging.Handler | None, Path | None, Exception | None]:
-    preferred_dirs = [
-        Path(os.getenv("PROGRAMDATA", "C:/ProgramData")) / "OneSign",
-        Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "OneSign",
-    ]
+    program_data_dir = Path(os.getenv("PROGRAMDATA", "C:/ProgramData")) / "OneSign"
+    local_app_data_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "OneSign"
+
+    # Interactive (non-admin) runs should prefer user-writable logs first.
+    if _is_elevated():
+        preferred_dirs = [program_data_dir, local_app_data_dir]
+    else:
+        preferred_dirs = [local_app_data_dir, program_data_dir]
 
     last_error: Exception | None = None
     for log_dir in preferred_dirs:
@@ -51,7 +64,7 @@ def _build_log_file_handler() -> tuple[logging.Handler | None, Path | None, Exce
                 log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
             )
             return handler, log_file, None
-        except OSError as exc:
+        except Exception as exc:
             last_error = exc
 
     return None, None, last_error

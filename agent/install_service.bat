@@ -21,6 +21,12 @@ if not exist "%NSSM%" (
     exit /b 1
 )
 
+SET "LOG_DIR=%PROGRAMDATA%\OneSign"
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+if exist "%LOG_DIR%" (
+    icacls "%LOG_DIR%" /grant "Users:(OI)(CI)M" >nul 2>&1
+)
+
 REM Install the service
 "%NSSM%" install %SVC_NAME% "%EXE%"
 if errorlevel 1 (
@@ -39,9 +45,9 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 "%NSSM%" set %SVC_NAME% ObjectName LocalSystem ""
 if errorlevel 1 exit /b 1
-"%NSSM%" set %SVC_NAME% AppStdout "%PROGRAMDATA%\OneSign\service_out.log"
+"%NSSM%" set %SVC_NAME% AppStdout "%LOG_DIR%\service_out.log"
 if errorlevel 1 exit /b 1
-"%NSSM%" set %SVC_NAME% AppStderr "%PROGRAMDATA%\OneSign\service_err.log"
+"%NSSM%" set %SVC_NAME% AppStderr "%LOG_DIR%\service_err.log"
 if errorlevel 1 exit /b 1
 
 REM Start the service
