@@ -35,21 +35,42 @@ from win_login import lock_workstation, unlock_workstation, is_workstation_locke
 from tray_app  import TrayApp
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
-LOG_DIR  = Path(os.getenv("PROGRAMDATA", "C:/ProgramData")) / "OneSign"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / "agent.log"
+
+def _build_log_file_handler() -> tuple[logging.Handler | None, Path | None, Exception | None]:
+    preferred_dirs = [
+        Path(os.getenv("PROGRAMDATA", "C:/ProgramData")) / "OneSign",
+        Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "OneSign",
+    ]
+
+    last_error: Exception | None = None
+    for log_dir in preferred_dirs:
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / "agent.log"
+            handler = logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+            )
+            return handler, log_file, None
+        except OSError as exc:
+            last_error = exc
+
+    return None, None, last_error
+
+
+file_handler, LOG_FILE, log_error = _build_log_file_handler()
+handlers = [logging.StreamHandler(sys.stdout)]
+if file_handler is not None:
+    handlers.insert(0, file_handler)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.handlers.RotatingFileHandler(
-            LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
-        ),
-        logging.StreamHandler(sys.stdout),
-    ],
+    handlers=handlers,
 )
 logger = logging.getLogger("onesign")
+
+if LOG_FILE is None and log_error is not None:
+    logger.warning("File logging disabled: %s", log_error)
 
 # ── Config defaults ───────────────────────────────────────────────────────────
 DEFAULT_CONFIG = {
