@@ -98,40 +98,6 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-function createModalController(id) {
-  const el = document.getElementById(id);
-  if (window.bootstrap?.Modal) return new window.bootstrap.Modal(el);
-
-  const backdropId = `${id}-backdrop`;
-  const closeBtns = el.querySelectorAll('[data-bs-dismiss="modal"]');
-  const controller = {
-    show() {
-      el.style.display = 'block';
-      el.classList.add('show');
-      el.setAttribute('aria-modal', 'true');
-      el.removeAttribute('aria-hidden');
-      document.body.classList.add('modal-open');
-      if (!document.getElementById(backdropId)) {
-        const backdrop = document.createElement('div');
-        backdrop.id = backdropId;
-        backdrop.className = 'modal-backdrop fade show';
-        document.body.appendChild(backdrop);
-      }
-    },
-    hide() {
-      el.classList.remove('show');
-      el.style.display = 'none';
-      el.removeAttribute('aria-modal');
-      el.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('modal-open');
-      document.getElementById(backdropId)?.remove();
-    }
-  };
-
-  closeBtns.forEach(btn => btn.addEventListener('click', controller.hide));
-  return controller;
-}
-
 const cardModal = createModalController('cardModal');
 
 async function loadCards() {
