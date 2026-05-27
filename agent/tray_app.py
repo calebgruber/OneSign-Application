@@ -14,6 +14,7 @@ The tray icon shows:
 
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -167,8 +168,11 @@ class TrayApp:
         menu = pystray.Menu(
             pystray.MenuItem(lambda _: self._status_text, None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Enroll Card…",     self._on_enroll),
+            pystray.MenuItem("Sync with Server", self._on_sync),
+            pystray.MenuItem("Show Connection Status", self._on_status),
+            pystray.MenuItem("Open Agent Log", self._on_open_log),
             pystray.MenuItem("Open Admin Panel", self._on_open_admin),
+            pystray.MenuItem("Enroll Card…",     self._on_enroll),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit Agent",        self._on_exit),
         )
@@ -195,16 +199,39 @@ class TrayApp:
     def _on_enroll(self, icon, item):
         self.notify(
             "OneSign Enrollment",
-            "Tap the card/badge you want to enroll on the reader now.",
+            "Start enrollment in the admin panel, then tap the card on this reader.",
             duration=8,
         )
         if self._agent:
             self._agent.start_enrollment_mode()
 
+    def _on_sync(self, icon, item):
+        if self._agent:
+            self._agent.sync_with_server()
+
+    def _on_status(self, icon, item):
+        if self._agent:
+            self.notify("OneSign Status", self._agent.get_status_summary(), duration=6)
+
+    def _on_open_log(self, icon, item):
+        if not self._agent:
+            return
+        log_path = self._agent.get_log_file_path()
+        if not log_path or not os.path.isfile(log_path):
+            self.notify("OneSign Log", "No log file found yet.", duration=5)
+            return
+        try:
+            os.startfile(log_path)  # type: ignore[attr-defined]
+        except Exception:
+            try:
+                subprocess.Popen(["notepad.exe", log_path], close_fds=True)
+            except Exception as exc:
+                self.notify("OneSign Log Error", f"Could not open log file: {exc}", duration=6)
+
     def _on_open_admin(self, icon, item):
         import webbrowser
         if self._agent:
-            url = self._agent.config.get("server", "url", fallback="http://localhost/admin")
+            url = self._agent.get_admin_url()
         else:
             url = "http://localhost/admin"
         webbrowser.open(url)

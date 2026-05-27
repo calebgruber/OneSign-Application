@@ -17,6 +17,7 @@ import configparser
 import logging
 import logging.handlers
 import os
+import platform
 import socket
 import sys
 import threading
@@ -27,7 +28,10 @@ import requests
 
 # ── Local imports ─────────────────────────────────────────────────────────────
 # Allow running from the agent/ directory or from the installed EXE location.
-_BASE = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    _BASE = Path(sys.executable).resolve().parent
+else:
+    _BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_BASE))
 
 from pcprox    import PcProxReader, PcProxError
@@ -104,6 +108,7 @@ DEFAULT_CONFIG = {
 }
 
 HOSTNAME = socket.gethostname()
+APP_VERSION = "1.0.0"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,12 +126,17 @@ class OneSignAgent:
             self.config.read(cfg_file, encoding="utf-8")
         else:
             logger.warning("config.ini not found at %s — using defaults", cfg_file)
+        self._config_path = cfg_file
 
         self._running        = False
         self._last_card_hex  = None      # card ID currently on reader
         self._card_absent_since: float | None = None
         self._lock_pending   = False
         self._enrollment_mode = False
+        self._reader_connected = False
+        self._last_reader_error = ""
+        self._server_connected = False
+        self._last_server_error = ""
 
         self.tray = TrayApp(agent_ref=self)
         self.reader = PcProxReader(
@@ -137,7 +147,78 @@ class OneSignAgent:
             "X-Api-Key": self.config.get("server", "api_key"),
             "Content-Type": "application/json",
         })
-        self._session.timeout = 8
+        self._session_timeout = 8
+
+    def get_server_base_url(self) -> str:
+        raw = self.config.get("server", "url", fallback="http://localhost").strip()
+        if not raw or "YOUR_SERVER" in raw.upper():
+            return "http://localhost"
+        return raw.rstrip("/")
+
+    def get_admin_url(self) -> str:
+        base = self.get_server_base_url()
+        if base.lower().endswith("/admin"):
+            return base
+        return f"{base}/admin"
+
+    def get_log_file_path(self) -> str | None:
+        return str(LOG_FILE) if LOG_FILE else None
+
+    def get_status_summary(self) -> str:
+        reader_state = "Connected" if self._reader_connected else "Disconnected"
+        server_state = "Connected" if self._server_connected else "Disconnected"
+        return f"Reader: {reader_state} | Server: {server_state}"
+
+    def sync_with_server(self) -> tuple[bool, str]:
+        ok, msg = self._send_heartbeat_once()
+        if ok:
+            self.tray.notify("OneSign — Sync", "Server sync completed successfully.", duration=4)
+            return True, msg
+        self.tray.notify("OneSign — Sync Failed", msg, duration=6)
+        return False, msg
+
+    def _send_heartbeat_once(self) -> tuple[bool, str]:
+        url = self.get_server_base_url() + "/api/heartbeat.php"
+        payload = {
+            "workstation": HOSTNAME,
+            "status": "locked" if is_workstation_locked() else "online",
+            "os_version": platform.platform(),
+            "agent_version": APP_VERSION,
+        }
+        try:
+            resp = self._session.post(url, json=payload, timeout=self._session_timeout)
+        except requests.RequestException as exc:
+            self._server_connected = False
+            self._last_server_error = str(exc)
+            return False, f"Cannot reach server: {exc}"
+
+        if resp.status_code != 200:
+            self._server_connected = False
+            self._last_server_error = f"HTTP {resp.status_code}"
+            return False, f"Server returned HTTP {resp.status_code}"
+
+        self._server_connected = True
+        self._last_server_error = ""
+        return True, "Heartbeat OK"
+
+    def _get_enrollment_token(self) -> str | None:
+        url = self.get_server_base_url() + "/api/enroll.php"
+        try:
+            resp = self._session.get(
+                url,
+                params={"workstation": HOSTNAME},
+                timeout=self._session_timeout,
+            )
+            if resp.status_code != 200:
+                logger.debug("Enrollment poll failed HTTP %d", resp.status_code)
+                return None
+            payload = resp.json()
+            if payload.get("pending") and payload.get("token"):
+                return str(payload.get("token"))
+            return None
+        except Exception as exc:
+            logger.debug("Enrollment poll error: %s", exc)
+            return None
 
     # ── Entry point ───────────────────────────────────────────────────────────
 
@@ -146,6 +227,7 @@ class OneSignAgent:
         self._running = True
         logger.info("OneSign Agent starting on %s", HOSTNAME)
         self.tray.notify("OneSign Agent", "Starting up…", duration=3)
+        self.sync_with_server()
 
         # Heartbeat thread
         t_hb = threading.Thread(target=self._heartbeat_loop, daemon=True)
@@ -176,9 +258,13 @@ class OneSignAgent:
         while self._running:
             try:
                 self.reader.connect()
+                self._reader_connected = True
+                self._last_reader_error = ""
                 self.tray.set_status("connected", f"OneSign — Reader connected on {HOSTNAME}")
                 self._poll_loop(poll_ms / 1000.0)
             except PcProxError as exc:
+                self._reader_connected = False
+                self._last_reader_error = str(exc)
                 logger.warning("Reader error: %s — retrying in %ds", exc, reconnect)
                 self.tray.set_status("idle", "OneSign — Reader disconnected")
                 self.tray.notify("OneSign — Reader Error", str(exc), duration=4)
@@ -187,6 +273,7 @@ class OneSignAgent:
                     self.reader.disconnect()
                 except Exception:
                     pass
+                self._reader_connected = False
             time.sleep(reconnect)
 
     def _poll_loop(self, interval: float):
@@ -206,7 +293,11 @@ class OneSignAgent:
                 if self._enrollment_mode:
                     self._handle_enroll(card_hex)
                 else:
-                    self._handle_auth(card_hex)
+                    pending_token = self._get_enrollment_token()
+                    if pending_token:
+                        self._handle_enroll(card_hex, pending_token)
+                    else:
+                        self._handle_auth(card_hex)
 
             # ── Card still present ───────────────────────────────────────────
             elif card_hex and card_hex == self._last_card_hex:
@@ -234,25 +325,46 @@ class OneSignAgent:
 
     def _handle_auth(self, card_hex: str):
         self.tray.set_status("auth", "OneSign — Authenticating…")
-        url = self.config.get("server", "url").rstrip("/") + "/api/auth.php"
+        url = self.get_server_base_url() + "/api/auth.php"
         try:
             resp = self._session.post(url, json={
                 "card_id":    card_hex,
                 "workstation": HOSTNAME,
-            })
+            }, timeout=self._session_timeout)
         except requests.RequestException as exc:
             logger.error("Auth request failed: %s", exc)
+            self._server_connected = False
+            self._last_server_error = str(exc)
             self.tray.notify("OneSign — Error", "Cannot reach server. Check network.", duration=5)
             self.tray.set_status("connected")
             return
 
+        self._server_connected = (resp.status_code == 200)
         if resp.status_code == 200:
             data = resp.json()
+            if not data.get("authenticated"):
+                reason = data.get("reason", "unknown")
+                if reason == "card_not_found":
+                    self.tray.notify("OneSign — Unknown Badge", "This badge is not enrolled. Contact your administrator.", duration=5)
+                elif reason == "card_disabled":
+                    self.tray.notify("OneSign — Access Denied", "This badge has been disabled.", duration=5)
+                elif reason == "user_disabled":
+                    self.tray.notify("OneSign — Access Denied", "User account is disabled.", duration=5)
+                else:
+                    self.tray.notify("OneSign — Access Denied", f"Authentication failed ({reason}).", duration=5)
+                self.tray.set_status("connected")
+                return
+
             creds    = data.get("credentials") or {}
             username = creds.get("username", "")
             password = creds.get("password", "")
             domain   = creds.get("domain", ".")
             fullname = data.get("user", {}).get("full_name", username)
+
+            if not username or not password:
+                self.tray.notify("OneSign — Missing Credentials", "User has no Windows credentials configured in admin panel.", duration=6)
+                self.tray.set_status("connected")
+                return
 
             logger.info("Auth success: %s", username)
             self.tray.notify(
@@ -262,17 +374,12 @@ class OneSignAgent:
             )
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
-            locked = is_workstation_locked()
             ok = unlock_workstation(username, password, domain)
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)
         elif resp.status_code == 401:
-            logger.warning("Card not enrolled: %s", card_hex)
-            self.tray.notify("OneSign — Unknown Badge", "This badge is not enrolled. Contact your administrator.", duration=5)
-            self.tray.set_status("connected")
-        elif resp.status_code == 403:
-            logger.warning("Card disabled: %s", card_hex)
-            self.tray.notify("OneSign — Access Denied", "This badge has been disabled.", duration=5)
+            logger.warning("Authentication failed due to API key issue")
+            self.tray.notify("OneSign — Unauthorized", "API key rejected. Verify config.ini API key.", duration=6)
             self.tray.set_status("connected")
         else:
             logger.error("Auth error %d: %s", resp.status_code, resp.text[:200])
@@ -286,16 +393,24 @@ class OneSignAgent:
         self._last_card_hex   = None
         logger.info("Enrollment mode activated")
 
-    def _handle_enroll(self, card_hex: str):
+    def _handle_enroll(self, card_hex: str, token: str | None = None):
         self._enrollment_mode = False
-        url = self.config.get("server", "url").rstrip("/") + "/api/enroll.php"
+        enroll_token = token or self._get_enrollment_token()
+        if not enroll_token:
+            self.tray.notify(
+                "OneSign — Enrollment Pending",
+                "No enrollment request found. Start enrollment from the admin panel first.",
+                duration=6,
+            )
+            return
+
+        url = self.get_server_base_url() + "/api/enroll.php"
         try:
-            resp = self._session.post(url, json={
-                "card_id":  card_hex,
-                "hostname": HOSTNAME,
-                "action":   "submit",
-            })
-            if resp.status_code == 200:
+            resp = self._session.put(url, json={
+                "token": enroll_token,
+                "card_id": card_hex,
+            }, timeout=self._session_timeout)
+            if resp.status_code in (200, 201):
                 logger.info("Card enrolled: %s", card_hex)
                 self.tray.notify("OneSign — Enrolled", f"Badge {card_hex} enrolled successfully!", duration=5)
             else:
@@ -309,14 +424,11 @@ class OneSignAgent:
 
     def _heartbeat_loop(self):
         interval = self.config.getint("behavior", "heartbeat_interval", fallback=30)
-        url = self.config.get("server", "url").rstrip("/") + "/api/heartbeat.php"
         while self._running:
             try:
-                locked = is_workstation_locked()
-                self._session.post(url, json={
-                    "hostname": HOSTNAME,
-                    "status":   "locked" if locked else "active",
-                })
+                ok, msg = self._send_heartbeat_once()
+                if not ok:
+                    logger.debug("Heartbeat failed: %s", msg)
             except Exception as exc:
                 logger.debug("Heartbeat failed: %s", exc)
             time.sleep(interval)
