@@ -89,7 +89,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ConfigFile, Contents: string;
+  ConfigFile: string;
   ServerURL, ApiKey: string;
 begin
   if CurStep = ssPostInstall then
@@ -100,10 +100,8 @@ begin
 
     if FileExists(ConfigFile) then
     begin
-      LoadStringFromFile(ConfigFile, Contents);
-      StringChange(Contents, 'http://YOUR_SERVER_IP_OR_HOSTNAME', ServerURL);
-      StringChange(Contents, 'CHANGE_ME_TO_YOUR_API_KEY', ApiKey);
-      SaveStringToFile(ConfigFile, Contents, False);
+      SetIniString('server', 'url', ServerURL, ConfigFile);
+      SetIniString('server', 'api_key', ApiKey, ConfigFile);
     end;
   end;
 end;
