@@ -101,7 +101,7 @@ include __DIR__ . '/../includes/header.php';
 const cardModal = new bootstrap.Modal(document.getElementById('cardModal'));
 
 async function loadCards() {
-  const res  = await fetch('/api/cards.php');
+  const res  = await fetch('../api/cards.php');
   const data = await res.json();
   const tbody = document.getElementById('cards-tbody');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No cards enrolled.</td></tr>'; return; }
@@ -129,7 +129,7 @@ async function loadCards() {
 function showCardModal() { cardModal.show(); }
 
 async function toggleCard(id, active) {
-  await fetch(`/api/cards.php?id=${id}`, {
+  await fetch(`../api/cards.php?id=${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ active: !active }),
@@ -139,7 +139,7 @@ async function toggleCard(id, active) {
 
 async function deleteCard(id, cardId) {
   if (!confirm(`Remove card "${cardId}"?`)) return;
-  const r = await fetch(`/api/cards.php?id=${id}`, { method: 'DELETE' });
+  const r = await fetch(`../api/cards.php?id=${id}`, { method: 'DELETE' });
   if (r.ok) loadCards(); else alert('Delete failed.');
 }
 
@@ -149,7 +149,7 @@ async function saveCard() {
   const label  = document.getElementById('cLabel').value.trim();
   if (!cardId || !userId) { alert('Card ID and User are required.'); return; }
 
-  const r = await fetch('/api/cards.php', {
+  const r = await fetch('../api/cards.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ card_id: cardId, user_id: parseInt(userId), card_label: label }),

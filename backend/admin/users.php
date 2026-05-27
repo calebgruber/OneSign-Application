@@ -127,7 +127,7 @@ const userModal = new bootstrap.Modal(document.getElementById('userModal'));
 let usersData = [];
 
 async function loadUsers() {
-  const res = await fetch('/api/users.php');
+  const res = await fetch('../api/users.php');
   usersData  = await res.json();
   renderUsers(usersData);
 }
@@ -170,13 +170,13 @@ function showUserModal(data) {
 }
 
 async function editUser(id) {
-  const r = await fetch(`/api/users.php?id=${id}`);
+  const r = await fetch(`../api/users.php?id=${id}`);
   showUserModal(await r.json());
 }
 
 async function deleteUser(id, name) {
   if (!confirm(`Delete user "${name}"? This will also remove all their enrolled cards.`)) return;
-  const r = await fetch(`/api/users.php?id=${id}`, { method: 'DELETE' });
+  const r = await fetch(`../api/users.php?id=${id}`, { method: 'DELETE' });
   if (r.ok) loadUsers(); else alert('Delete failed.');
 }
 
@@ -194,7 +194,7 @@ async function saveUser() {
   if (pw) body.windows_password = pw;
   if (!body.username || !body.full_name) { alert('Username and Full Name are required.'); return; }
 
-  const r = await fetch(id ? `/api/users.php?id=${id}` : '/api/users.php', {
+  const r = await fetch(id ? `../api/users.php?id=${id}` : '../api/users.php', {
     method: id ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
