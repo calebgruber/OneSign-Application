@@ -45,7 +45,7 @@ Name: "installservice"; Description: "Install and start Windows service (recomme
 ; Main EXE (built by PyInstaller)
 Source: "..\agent\dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
-; pcProx DLL — must be placed in installer\ folder before building
+; pcProx DLLs — place both files in installer\ before building (one is selected at install time)
 Source: "pcProxAPI64.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: Is64BitInstallMode
 Source: "pcProxAPI.dll";   DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
 
