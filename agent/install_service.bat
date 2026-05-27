@@ -23,7 +23,10 @@ if not exist "%NSSM%" (
 
 REM Install the service
 "%NSSM%" install %SVC_NAME% "%EXE%"
-if errorlevel 1 exit /b 1
+if errorlevel 1 (
+    echo ERROR: Failed to install service %SVC_NAME% with NSSM.
+    exit /b 1
+)
 "%NSSM%" set %SVC_NAME% AppDirectory "%INSTALL_DIR%"
 if errorlevel 1 exit /b 1
 "%NSSM%" set %SVC_NAME% AppParameters "%INSTALL_DIR%\config.ini"
@@ -43,7 +46,10 @@ if errorlevel 1 exit /b 1
 
 REM Start the service
 net start %SVC_NAME%
-if errorlevel 1 exit /b 1
+if errorlevel 1 (
+    echo ERROR: Service %SVC_NAME% was installed but could not be started.
+    exit /b 1
+)
 
 echo.
 echo [OneSign] Service installed and started successfully.

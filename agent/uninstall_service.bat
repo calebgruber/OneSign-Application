@@ -19,6 +19,7 @@ if errorlevel 1 (
 net stop %SVC_NAME% 2>nul
 if exist "%NSSM%" (
     "%NSSM%" remove %SVC_NAME% confirm
+    if errorlevel 1 sc delete "%SVC_NAME%" >nul 2>&1
 ) else (
     sc delete "%SVC_NAME%" >nul 2>&1
 )
