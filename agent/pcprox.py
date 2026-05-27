@@ -17,6 +17,7 @@ import ctypes
 import logging
 import os
 import platform
+import sys
 import time
 
 logger = logging.getLogger(__name__)
@@ -48,12 +49,7 @@ class PcProxReader:
     """
 
     def __init__(self, dll_path: str = None):
-        if dll_path:
-            self._dll_path = dll_path
-        elif platform.architecture()[0] == '64bit':
-            self._dll_path = _DEFAULT_DLL_64
-        else:
-            self._dll_path = _DEFAULT_DLL_32
+        self._dll_path = self._resolve_dll_path(dll_path)
 
         self._lib = None
         self._dev_id = ctypes.c_long(0)
@@ -87,6 +83,33 @@ class PcProxReader:
         self._connected = True
         logger.info("pcProx reader connected (dev_id=%d)", self._dev_id.value)
         return True
+
+    def _resolve_dll_path(self, dll_path: str | None) -> str:
+        arch64 = platform.architecture()[0] == '64bit'
+
+        configured = (dll_path or '').strip().strip('"')
+        if configured:
+            if configured.lower().endswith('.exe'):
+                logger.warning("Configured reader dll_path points to EXE (%s); ignoring it", configured)
+            elif configured.lower().endswith('.dll'):
+                return configured
+            else:
+                logger.warning("Configured reader dll_path is not a DLL (%s); ignoring it", configured)
+
+        base_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
+        bundled_64 = os.path.join(base_dir, 'pcProxAPI64.dll')
+        bundled_32 = os.path.join(base_dir, 'pcProxAPI.dll')
+
+        if arch64:
+            candidates = [bundled_64, bundled_32, _DEFAULT_DLL_64, _DEFAULT_DLL_32]
+        else:
+            candidates = [bundled_32, bundled_64, _DEFAULT_DLL_32, _DEFAULT_DLL_64]
+
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+
+        return _DEFAULT_DLL_64 if arch64 else _DEFAULT_DLL_32
 
     def disconnect(self):
         """Close USB connection and unload DLL."""
