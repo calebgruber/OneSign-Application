@@ -36,43 +36,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OneSign &mdash; Admin Login</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="/assets/css/onesign.css">
 </head>
-<body class="onesign-login-bg d-flex align-items-center justify-content-center vh-100">
-<div class="card shadow-lg onesign-login-card">
-    <div class="card-body p-5">
-        <div class="text-center mb-4">
-            <img src="/assets/img/logo.svg" alt="OneSign" height="60" class="mb-3">
-            <h4 class="fw-bold text-primary">OneSign Admin</h4>
-            <p class="text-muted small">Sign in to manage your OneSign deployment</p>
-        </div>
-        <?php if ($error): ?>
-        <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-        <form method="post" autocomplete="off">
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Username</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" name="username" class="form-control" placeholder="admin" required autofocus>
-                </div>
-            </div>
-            <div class="mb-4">
-                <label class="form-label fw-semibold">Password</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
-                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
-            </button>
-        </form>
+<body class="antialiased d-flex flex-column" style="min-height:100vh; background:var(--tblr-body-bg)">
+<div class="page page-center">
+  <div class="container container-tight py-4">
+    <div class="text-center mb-4">
+      <img src="/assets/img/logo.svg" alt="OneSign" height="56" class="mb-3">
+      <h2 class="fw-bold">OneSign Admin</h2>
+      <p class="text-muted">Sign in to manage your OneSign deployment</p>
     </div>
+    <div class="card card-md shadow-sm">
+      <div class="card-body">
+        <?php if ($error): ?>
+        <div class="alert alert-danger" role="alert">
+          <div class="d-flex"><i class="ti ti-alert-triangle me-2 mt-1"></i><?= htmlspecialchars($error) ?></div>
+        </div>
+        <?php endif; ?>
+        <form method="post" autocomplete="off" action="">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" name="username" class="form-control" placeholder="admin" required autofocus>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Password</label>
+            <div class="input-group input-group-flat">
+              <input type="password" name="password" id="loginPw" class="form-control" placeholder="Your password" required>
+              <span class="input-group-text">
+                <a href="#" class="link-secondary" onclick="togglePw('loginPw');return false;" title="Show/hide password">
+                  <i class="ti ti-eye"></i>
+                </a>
+              </span>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="ti ti-login me-1"></i>Sign in
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="text-center text-muted mt-3 small">
+      OneSign &mdash; Imprivata-compatible tap &amp; go authentication
+    </div>
+  </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js"></script>
+<script>function togglePw(id){var e=document.getElementById(id);e.type=e.type==='password'?'text':'password';}</script>
 </body>
 </html>

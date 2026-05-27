@@ -1,0 +1,105 @@
+/**
+ * onesign.css — Tabler UI overrides for OneSign admin
+ */
+
+/* ── Sidebar brand color ──────────────────────────────────────────── */
+:root {
+  --onesign-primary: #1a6fc4;
+  --onesign-secondary: #0ea5e9;
+}
+
+.navbar-vertical.navbar-expand-lg {
+  --tblr-navbar-bg: #1a2035;
+  --tblr-navbar-color: rgba(255,255,255,.75);
+  --tblr-navbar-hover-color: #fff;
+  --tblr-navbar-active-color: #fff;
+  --tblr-navbar-border-color: rgba(255,255,255,.08);
+}
+
+.navbar-brand-image {
+  height: 32px;
+}
+
+/* ── OneSign logo text in sidebar ────────────────────────────────── */
+.onesign-brand-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: .02em;
+  color: #fff;
+}
+
+/* ── Sidebar active item highlight ──────────────────────────────── */
+.navbar-vertical .nav-link.active,
+.navbar-vertical .nav-link:focus {
+  background: rgba(255,255,255,.10);
+  border-radius: 6px;
+  color: #fff !important;
+}
+
+/* ── Status dot pulse (workstations table) ───────────────────────── */
+@keyframes onesign-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(10, 200, 140, 0.6); }
+  70%  { box-shadow: 0 0 0 8px rgba(10, 200, 140, 0);  }
+  100% { box-shadow: 0 0 0 0 rgba(10, 200, 140, 0);    }
+}
+
+.onesign-dot-online {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #0ca678;
+  animation: onesign-pulse 2s infinite;
+  margin-right: 6px;
+}
+
+.onesign-dot-offline {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #868e96;
+  margin-right: 6px;
+}
+
+.onesign-dot-locked {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f76707;
+  margin-right: 6px;
+}
+
+/* ── Enrollment tap animation ────────────────────────────────────── */
+@keyframes onesign-tap {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.18); opacity: .7; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.onesign-pulse {
+  animation: onesign-tap 1.5s ease-in-out infinite;
+}
+
+/* ── Stat card top-border accent ─────────────────────────────────── */
+.card.onesign-stat {
+  border-top: 3px solid var(--onesign-primary);
+}
+
+/* ── Table monospace card IDs ─────────────────────────────────────── */
+.card-id-cell {
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+  font-size: .85em;
+  letter-spacing: .04em;
+}
+
+/* ── Toast container (top-right) ─────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1090;
+  min-width: 280px;
+  max-width: 400px;
+}

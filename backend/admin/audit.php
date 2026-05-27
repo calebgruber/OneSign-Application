@@ -1,6 +1,6 @@
 <?php
 /**
- * Audit Log - Tabulator view
+ * Audit Log — Tabler UI table
  */
 require_once __DIR__ . '/../includes/auth_check.php';
 requireAdminLogin();
@@ -8,56 +8,86 @@ $pageTitle = 'Audit Log';
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h4 class="fw-bold mb-0">Audit Log</h4>
-        <p class="text-muted small mb-0">Full history of OneSign events</p>
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Audit Log</h2>
+        <div class="text-muted mt-1">Full history of OneSign authentication events</div>
+      </div>
+      <div class="col-auto ms-auto d-flex gap-2">
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" id="auditSearch" placeholder="Search…" oninput="filterTable('audit-tbody', this.value)">
+          <span class="input-group-text"><i class="ti ti-search"></i></span>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadAudit()">
+          <i class="ti ti-refresh"></i>
+        </button>
+      </div>
     </div>
-    <button class="btn btn-outline-secondary btn-sm" onclick="table.clearFilter(); table.setData()">
-        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-    </button>
+  </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-body">
-        <div id="audit-table"></div>
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table table-sm">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>User</th>
+              <th>Card ID</th>
+              <th>Workstation</th>
+              <th>IP</th>
+              <th class="text-center">Result</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-tbody">
+            <tr><td colspan="8" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-const table = new Tabulator('#audit-table', {
-    ajaxURL: '/api/audit.php?limit=500',
-    layout: 'fitColumns',
-    pagination: 'local',
-    paginationSize: 20,
-    placeholder: 'No events found.',
-    initialSort: [{ column: 'created_at', dir: 'desc' }],
-    columns: [
-        { title: 'Time', field: 'created_at', sorter: 'datetime', width: 160,
-          formatter: (c) => fmtDate(c.getValue(), true) },
-        { title: 'Event', field: 'event_type', sorter: 'string', widthGrow: 1.5,
-          formatter: (c) => {
-            const ev = c.getValue();
-            const badgeClass = ev.includes('success') || ev.includes('enrolled') ? 'bg-success'
-                : ev.includes('fail') || ev.includes('not_found') || ev.includes('disabled') ? 'bg-danger'
-                : ev === 'logout' ? 'bg-secondary' : 'bg-primary';
-            return `<span class="badge ${badgeClass}">${escHtml(ev.replace(/_/g,' '))}</span>`;
-          }},
-        { title: 'User', field: 'full_name', sorter: 'string', widthGrow: 1.5,
-          formatter: (c) => escHtml(c.getValue() || '—') },
-        { title: 'Card ID', field: 'card_id', sorter: 'string',
-          formatter: (c) => c.getValue() ? `<code>${escHtml(c.getValue())}</code>` : '—' },
-        { title: 'Workstation', field: 'workstation', sorter: 'string',
-          formatter: (c) => escHtml(c.getValue() || '—') },
-        { title: 'IP', field: 'ip_address', sorter: 'string', width: 130 },
-        { title: 'Result', field: 'success', hozAlign: 'center', width: 90,
-          formatter: (c) => c.getValue()
-            ? '<span class="badge bg-success">OK</span>'
-            : '<span class="badge bg-danger">FAIL</span>' },
-        { title: 'Details', field: 'details', sorter: 'string', widthGrow: 2,
-          formatter: (c) => `<span class="text-muted small">${escHtml(c.getValue() || '')}</span>` },
-    ],
-});
+async function loadAudit() {
+  const res  = await fetch('/api/audit.php?limit=500');
+  const data = await res.json();
+  const tbody = document.getElementById('audit-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No events found.</td></tr>'; return; }
+
+  tbody.innerHTML = data.map(ev => {
+    const badgeCls = ev.event_type.includes('success') || ev.event_type.includes('enrolled')
+      ? 'bg-green-lt text-green'
+      : ev.event_type.includes('not_found') || ev.event_type.includes('disabled')
+        ? 'bg-red-lt text-red'
+        : ev.event_type === 'logout'
+          ? 'bg-secondary-lt text-secondary'
+          : 'bg-blue-lt text-blue';
+    return `
+      <tr data-search="${escHtml(((ev.full_name||'')+(ev.card_id||'')+(ev.workstation||'')+ev.event_type).toLowerCase())}">
+        <td class="text-muted small text-nowrap">${fmtDate(ev.created_at, true)}</td>
+        <td><span class="badge ${badgeCls}">${escHtml(ev.event_type.replace(/_/g,' '))}</span></td>
+        <td>${escHtml(ev.full_name || '—')}</td>
+        <td>${ev.card_id ? `<code>${escHtml(ev.card_id)}</code>` : '—'}</td>
+        <td>${escHtml(ev.workstation || '—')}</td>
+        <td class="text-muted small">${escHtml(ev.ip_address || '')}</td>
+        <td class="text-center">${ev.success
+          ? '<span class="badge bg-green">OK</span>'
+          : '<span class="badge bg-red">FAIL</span>'}</td>
+        <td class="text-muted small">${escHtml(ev.details || '')}</td>
+      </tr>`;
+  }).join('');
+}
+
+loadAudit();
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
