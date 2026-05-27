@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -103,6 +104,7 @@ DEFAULT_CONFIG = {
     "reader": {
         "dll_path": r"C:\Program Files\RF IDeas\pcProx\pcProxAPI64.dll",
         "poll_interval_ms": "250",
+        "active_device_index": "-1",
     },
     "behavior": {
         "lock_on_remove":    "true",
@@ -147,11 +149,16 @@ class OneSignAgent:
         self._last_reader_error = ""
         self._server_connected = False
         self._last_server_error = ""
+        self._reader_lock = threading.Lock()
+        self._reader_reconnect_requested = False
 
         self.tray = TrayApp(agent_ref=self)
         self.reader = PcProxReader(
             dll_path=self.config.get("reader", "dll_path")
         )
+        configured_index = self.config.getint("reader", "active_device_index", fallback=-1)
+        if configured_index >= 0:
+            self.reader.set_active_device(configured_index)
         self._session = requests.Session()
         self._session.headers.update({
             "X-Api-Key": self.config.get("server", "api_key"),
@@ -178,6 +185,48 @@ class OneSignAgent:
         reader_state = "Connected" if self._reader_connected else "Disconnected"
         server_state = "Connected" if self._server_connected else "Disconnected"
         return f"Reader: {reader_state} | Server: {server_state}"
+
+    def get_reader_control_status(self) -> dict[str, Any]:
+        selected = self.reader.get_active_device_index()
+        return {
+            "connected": self._reader_connected,
+            "selected_index": selected,
+            "dll_path": self.config.get("reader", "dll_path"),
+            "last_error": self._last_reader_error,
+        }
+
+    def enumerate_readers(self) -> tuple[list[dict], str | None]:
+        temp_reader = PcProxReader(dll_path=self.config.get("reader", "dll_path"))
+        selected = self.reader.get_active_device_index()
+        if selected >= 0:
+            temp_reader.set_active_device(selected)
+        try:
+            return temp_reader.list_devices(), None
+        except Exception as exc:
+            return [], str(exc)
+
+    def select_reader_index(self, index: int) -> tuple[bool, str]:
+        if index < 0:
+            return False, "Invalid reader index"
+        self.reader.set_active_device(index)
+        self.config.set("reader", "active_device_index", str(index))
+        with self._reader_lock:
+            self._reader_reconnect_requested = True
+        return True, f"Reader {index} selected; reconnecting"
+
+    def reconnect_reader(self) -> tuple[bool, str]:
+        with self._reader_lock:
+            self._reader_reconnect_requested = True
+        return True, "Reader reconnect requested"
+
+    def read_card_once(self, timeout_seconds: float = 5.0) -> str | None:
+        deadline = time.monotonic() + max(0.5, float(timeout_seconds))
+        while time.monotonic() < deadline:
+            card = self.reader.get_card_hex()
+            if card:
+                return card
+            time.sleep(0.15)
+        return None
 
     def sync_with_server(self) -> tuple[bool, str]:
         ok, msg = self._send_heartbeat_once()
@@ -284,7 +333,12 @@ class OneSignAgent:
                 except Exception:
                     pass
                 self._reader_connected = False
-            time.sleep(reconnect)
+            sleep_for = reconnect
+            with self._reader_lock:
+                if self._reader_reconnect_requested:
+                    self._reader_reconnect_requested = False
+                    sleep_for = 0
+            time.sleep(sleep_for)
 
     def _poll_loop(self, interval: float):
         lock_delay = self.config.getfloat("behavior", "lock_delay_seconds", fallback=5.0)
@@ -328,6 +382,11 @@ class OneSignAgent:
                     self.tray.notify("OneSign", "Badge removed — locking workstation.", duration=3)
                     self.tray.set_status("locked", "OneSign — Workstation locked")
                     lock_workstation()
+
+            with self._reader_lock:
+                if self._reader_reconnect_requested:
+                    self._reader_reconnect_requested = False
+                    break
 
             time.sleep(interval)
 

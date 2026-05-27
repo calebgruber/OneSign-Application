@@ -159,12 +159,15 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[server] api_key` | `CHANGE_ME` | API key from admin panel |
 | `[reader] dll_path` | `C:\...\pcProxAPI64.dll` | Path to pcProx DLL |
 | `[reader] poll_interval_ms` | `250` | Card polling interval |
+| `[reader] active_device_index` | `-1` | Reader index to use when multiple readers are connected |
 | `[behavior] lock_on_remove` | `true` | Lock on badge removal |
 | `[behavior] lock_delay_seconds` | `5` | Seconds before locking |
 | `[behavior] heartbeat_interval` | `30` | Heartbeat period (seconds) |
 | `[credential_provider] enabled` | `false` | Use external credential provider helper for unlocks |
 | `[credential_provider] command` | *(empty)* | Command to invoke helper (receives JSON creds on stdin) |
 | `[credential_provider] timeout_seconds` | `20` | Helper process timeout in seconds |
+
+Tip: If the reader is not connecting, open the tray menu and use **Reader Control…** to enumerate attached readers, select a device index, reconnect, and run a test read.
 
 ### `backend/config/config.php`
 

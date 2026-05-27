@@ -18,6 +18,12 @@ import subprocess
 import sys
 import threading
 import time
+try:
+    import tkinter as tk
+    from tkinter import messagebox
+except Exception:  # pragma: no cover - depends on host runtime
+    tk = None
+    messagebox = None
 
 import pystray
 from PIL import Image, ImageDraw
@@ -173,6 +179,7 @@ class TrayApp:
             pystray.MenuItem("Open Agent Log", self._on_open_log),
             pystray.MenuItem("Open Admin Panel", self._on_open_admin),
             pystray.MenuItem("Enroll Card…",     self._on_enroll),
+            pystray.MenuItem("Reader Control…",  self._on_reader_control),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit Agent",        self._on_exit),
         )
@@ -235,3 +242,96 @@ class TrayApp:
         else:
             url = "http://localhost/admin"
         webbrowser.open(url)
+
+    def _on_reader_control(self, icon, item):
+        if not self._agent:
+            self.notify("Reader Control", "Agent context is unavailable.", duration=5)
+            return
+        if tk is None or messagebox is None:
+            self.notify("Reader Control", "Tkinter is not available in this build.", duration=6)
+            return
+        threading.Thread(target=self._open_reader_control_popup, daemon=True).start()
+
+    def _open_reader_control_popup(self):
+        root = tk.Tk()
+        root.title("OneSign Reader Control")
+        root.geometry("560x420")
+        root.resizable(False, False)
+
+        status_var = tk.StringVar()
+        readers_list = tk.Listbox(root, height=12, width=80)
+        readers_list.pack(padx=10, pady=(10, 6), fill="x")
+
+        tk.Label(root, textvariable=status_var, anchor="w", justify="left").pack(
+            padx=10, pady=(0, 8), fill="x"
+        )
+
+        footer_var = tk.StringVar(value="Select a reader and click Apply Selection.")
+        tk.Label(root, textvariable=footer_var, anchor="w").pack(padx=10, pady=(0, 8), fill="x")
+
+        readers_cache: list[dict] = []
+
+        def refresh():
+            readers_list.delete(0, tk.END)
+            readers, err = self._agent.enumerate_readers()
+            readers_cache.clear()
+            readers_cache.extend(readers)
+            if err:
+                footer_var.set(f"Reader enumerate failed: {err}")
+            elif not readers:
+                footer_var.set("No readers found. Check USB/cable/drivers and DLL path.")
+            else:
+                footer_var.set(f"Found {len(readers)} reader(s).")
+            selected = self._agent.get_reader_control_status().get("selected_index", -1)
+            for idx, r in enumerate(readers):
+                text = f"[{r.get('index', idx)}] {r.get('part_number') or 'Unknown'}  {r.get('vid_pid_vendor') or ''}  LUID={r.get('luid', 0)}"
+                readers_list.insert(tk.END, text)
+                if r.get("index") == selected:
+                    readers_list.select_set(idx)
+
+            stat = self._agent.get_reader_control_status()
+            status_var.set(
+                f"Connected: {'Yes' if stat.get('connected') else 'No'} | "
+                f"Selected index: {stat.get('selected_index')} | "
+                f"DLL: {stat.get('dll_path')}"
+            )
+
+        def apply_selection():
+            selection = readers_list.curselection()
+            if not selection:
+                messagebox.showinfo("Reader Control", "Select a reader first.")
+                return
+            row = readers_cache[selection[0]]
+            ok, msg = self._agent.select_reader_index(int(row.get("index", -1)))
+            if not ok:
+                messagebox.showerror("Reader Control", msg)
+                return
+            footer_var.set(msg)
+            refresh()
+
+        def reconnect():
+            _, msg = self._agent.reconnect_reader()
+            footer_var.set(msg)
+            root.after(1000, refresh)
+
+        def test_read():
+            footer_var.set("Waiting for badge tap (5 seconds)…")
+            root.update_idletasks()
+            card = self._agent.read_card_once(timeout_seconds=5.0)
+            if card:
+                messagebox.showinfo("Reader Test", f"Card detected: {card}")
+                footer_var.set("Card read succeeded.")
+            else:
+                messagebox.showwarning("Reader Test", "No card detected within timeout.")
+                footer_var.set("No card read.")
+
+        button_bar = tk.Frame(root)
+        button_bar.pack(padx=10, pady=8, fill="x")
+        tk.Button(button_bar, text="Refresh", width=12, command=refresh).pack(side=tk.LEFT, padx=4)
+        tk.Button(button_bar, text="Apply Selection", width=14, command=apply_selection).pack(side=tk.LEFT, padx=4)
+        tk.Button(button_bar, text="Reconnect", width=12, command=reconnect).pack(side=tk.LEFT, padx=4)
+        tk.Button(button_bar, text="Test Read", width=12, command=test_read).pack(side=tk.LEFT, padx=4)
+        tk.Button(button_bar, text="Close", width=12, command=root.destroy).pack(side=tk.RIGHT, padx=4)
+
+        refresh()
+        root.mainloop()
