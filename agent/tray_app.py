@@ -31,6 +31,7 @@ _COLOR_GREY   = (140, 140, 140, 255)
 _COLOR_ORANGE = (247, 103, 7, 255)
 _COLOR_BLUE   = (26, 111, 196, 255)
 _COLOR_WHITE  = (255, 255, 255, 255)
+_COLOR_WHITE_80 = (255, 255, 255, 80)
 
 
 def _make_icon_image(status: str = "idle") -> Image.Image:
@@ -46,7 +47,7 @@ def _make_icon_image(status: str = "idle") -> Image.Image:
     draw.rounded_rectangle([6, 8, sz - 6, sz - 8], radius=8, fill=_COLOR_BLUE)
 
     # Magnetic stripe
-    draw.rectangle([10, 14, sz - 10, 20], fill=_COLOR_WHITE + (80,))
+    draw.rectangle([10, 14, sz - 10, 20], fill=_COLOR_WHITE_80)
 
     # Person circle
     cx, cy = sz // 2, sz // 2 + 4
