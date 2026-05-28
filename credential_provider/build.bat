@@ -20,7 +20,7 @@ where dotnet >nul 2>&1
 if %errorlevel% equ 0 (
     echo Building with dotnet SDK...
     dotnet build OneSignCredentialProvider.csproj -c Release -r win-x64 --no-self-contained
-    if %errorlevel% neq 0 (
+    if errorlevel 1 (
         echo Build failed.
         exit /b 1
     )
@@ -50,7 +50,7 @@ if "%MSBUILD%"=="" (
 
 echo Building with MSBuild: %MSBUILD%
 "%MSBUILD%" OneSignCredentialProvider.csproj /p:Configuration=Release /p:Platform=x64
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo Build failed.
     exit /b 1
 )
