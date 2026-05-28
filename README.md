@@ -158,9 +158,7 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[behavior] lock_on_remove` | `true` | Legacy option (tap-in/tap-out flow is preferred for pcProx readers) |
 | `[behavior] lock_delay_seconds` | `5` | Legacy delay option used with remove-based lock behavior |
 | `[behavior] heartbeat_interval` | `30` | Heartbeat period (seconds) |
-| `[credential_provider] enabled` | `false` | Use external credential provider helper for unlocks |
-| `[credential_provider] command` | *(empty)* | Command to invoke helper (receives JSON creds on stdin) |
-| `[credential_provider] timeout_seconds` | `20` | Helper process timeout in seconds |
+| `[ui] fullscreen_shell_enabled` | `true` | Shows a fullscreen session shell after successful badge sign-in |
 | `[updates] enabled` | `true` | Enable in-app update checks |
 | `[updates] github_repo` | `calebgruber/OneSign-Application` | GitHub repository to monitor |
 | `[updates] branch` | `main` | Branch used for commit-based update checks |
@@ -168,9 +166,10 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[updates] auto_install` | `false` | Automatically download/install when a new commit is detected |
 | `[updates] installer_url` | *(empty)* | Optional direct installer URL override |
 | `[updates] installer_asset_name` | `OneSignAgentSetup.exe` | Latest release asset filename used when `installer_url` is empty |
+| `[updates] source_update_enabled` | `true` | When running from a git checkout, updater will pull latest source, build, and restart |
 
 Tip: If the reader is not connecting, open the tray menu and use **Reader Control…** to enumerate attached readers, select a device index, reconnect, and run a test read.
-Tip: Use the tray menu **Check for Updates** action to download/install the latest agent package and restart after new commits are detected.
+Tip: Use the tray menu **Check for Updates** action to update and restart automatically. If running from a git checkout, the agent will pull latest source, run `agent/build.bat`, and relaunch.
 
 ### `backend/config/config.php`
 

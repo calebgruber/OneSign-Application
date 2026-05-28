@@ -49,4 +49,3 @@ if exist "dist\OneSignAgent.exe" (
   echo [OneSign] Build finished but dist\OneSignAgent.exe was not found.
   exit /b 1
 )
-pause

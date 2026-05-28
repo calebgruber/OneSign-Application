@@ -6,9 +6,9 @@ Responsibilities:
   2. Connects to the pcProx reader and polls every 250 ms.
   3. On card tap → calls backend /api/auth.php to get Windows credentials.
   4. Unlocks/logs in the workstation with those credentials.
-  5. On card removal → locks the workstation after a configurable delay.
+  5. On card removal / tap-out → locks the workstation.
   6. Sends a heartbeat every 30 s to /api/heartbeat.php.
-  7. Shows balloon notifications and a system tray icon.
+  7. Shows balloon notifications, a system tray icon, and a fullscreen session shell.
 
 Configuration: config.ini (next to the EXE).
 """
@@ -44,10 +44,9 @@ from pcprox    import PcProxReader, PcProxError
 from win_login import (
     lock_workstation,
     unlock_workstation,
-    unlock_with_credential_provider,
-    unlock_via_credential_provider_pipe,
     is_workstation_locked,
 )
+from session_shell import SessionShell
 from tray_app  import TrayApp
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
@@ -118,10 +117,8 @@ DEFAULT_CONFIG = {
         "reconnect_delay_s":  "10",
         "heartbeat_interval": "30",
     },
-    "credential_provider": {
-        "enabled": "false",
-        "command": "",
-        "timeout_seconds": "20",
+    "ui": {
+        "fullscreen_shell_enabled": "true",
     },
     "updates": {
         "enabled": "true",
@@ -131,6 +128,7 @@ DEFAULT_CONFIG = {
         "auto_install": "false",
         "installer_url": "",
         "installer_asset_name": "OneSignAgentSetup.exe",
+        "source_update_enabled": "true",
     },
 }
 
@@ -208,6 +206,7 @@ class OneSignAgent:
         self._last_notified_update_commit: str | None = None
         self._current_commit = self._resolve_local_commit()
         self._current_version = APP_VERSION
+        self.session_shell = SessionShell(on_lock_requested=self._lock_from_session_shell)
 
     def get_server_base_url(self) -> str:
         raw = self.config.get("server", "url", fallback="http://localhost").strip()
@@ -250,6 +249,12 @@ class OneSignAgent:
             return True, "Log cleared"
         except Exception as exc:
             return False, f"Could not clear log: {exc}"
+
+    def _lock_from_session_shell(self):
+        lock_workstation()
+        self.session_shell.hide()
+        self._active_session_card = None
+        self.tray.set_status("locked", "OneSign — Workstation locked")
 
     def get_status_summary(self) -> str:
         reader_state = "Connected" if self._reader_connected else "Disconnected"
@@ -346,14 +351,17 @@ class OneSignAgent:
                     self._last_notified_update_commit = latest_commit
                 return True, update_msg
 
-            self.tray.notify("OneSign Updater", "Downloading update package…", duration=4)
-            installer_path, download_err = self._download_update_installer(repo)
-            if download_err or not installer_path:
-                msg = download_err or "Update download failed."
-                self.tray.notify("OneSign Update Failed", msg, duration=6)
-                return False, msg
-
-            ok, launch_msg = self._launch_update_installer(installer_path)
+            if self._can_run_source_update():
+                self.tray.notify("OneSign Updater", "Pulling latest source and rebuilding…", duration=5)
+                ok, launch_msg = self._launch_source_update(branch)
+            else:
+                self.tray.notify("OneSign Updater", "Downloading update package…", duration=4)
+                installer_path, download_err = self._download_update_installer(repo)
+                if download_err or not installer_path:
+                    msg = download_err or "Update download failed."
+                    self.tray.notify("OneSign Update Failed", msg, duration=6)
+                    return False, msg
+                ok, launch_msg = self._launch_update_installer(installer_path)
             if not ok:
                 self.tray.notify("OneSign Update Failed", launch_msg, duration=7)
                 return False, launch_msg
@@ -380,6 +388,90 @@ class OneSignAgent:
             return raw
         except Exception:
             return ""
+
+    def _can_run_source_update(self) -> bool:
+        if not self.config.getboolean("updates", "source_update_enabled", fallback=True):
+            return False
+        repo_root = _BASE.parent
+        build_script = repo_root / "agent" / "build.bat"
+        git_dir = repo_root / ".git"
+        if not build_script.is_file() or not git_dir.exists():
+            return False
+        try:
+            subprocess.check_output(["git", "--version"], stderr=subprocess.DEVNULL, text=True)
+            return True
+        except Exception:
+            return False
+
+    def _launch_source_update(self, branch: str) -> tuple[bool, str]:
+        branch = (branch or "main").strip()
+        if not re.match(r"^[A-Za-z0-9._/-]+$", branch):
+            return False, "Invalid update branch name"
+
+        repo_root = _BASE.parent
+        agent_dir = repo_root / "agent"
+        build_script = agent_dir / "build.bat"
+        if not build_script.is_file():
+            return False, "Source update build script not found"
+
+        if getattr(sys, "frozen", False):
+            restart_cmd = f'start "" "{sys.executable}"'
+        else:
+            restart_cmd = (
+                f'start "" "{sys.executable}" '
+                f'"{agent_dir / "onesign_agent.py"}" "{self._config_path}"'
+            )
+
+        script_path = Path(tempfile.gettempdir()) / "OneSign" / "updates" / "run_onesign_source_update.cmd"
+        script_path.parent.mkdir(parents=True, exist_ok=True)
+
+        lines = [
+            "@echo off",
+            "setlocal",
+            f'cd /d "{repo_root}"',
+            f'git fetch origin "{branch}"',
+            "if errorlevel 1 goto :fail",
+            f'git checkout "{branch}"',
+            "if errorlevel 1 goto :fail",
+            f'git reset --hard "origin/{branch}"',
+            "if errorlevel 1 goto :fail",
+            f'cd /d "{agent_dir}"',
+            f'call "{build_script}"',
+            "if errorlevel 1 goto :fail",
+        ]
+        if getattr(sys, "frozen", False):
+            lines.extend([
+                'if exist "dist\\OneSignAgent.exe" (',
+                '  taskkill /f /im OneSignAgent.exe >nul 2>&1',
+                f'  copy /y "dist\\OneSignAgent.exe" "{Path(sys.executable)}" >nul 2>&1',
+                ")",
+            ])
+        lines.extend([
+            "net stop OneSignAgent >nul 2>&1",
+            "net start OneSignAgent >nul 2>&1",
+            restart_cmd,
+            "goto :cleanup",
+            ":fail",
+            "exit /b 1",
+            ":cleanup",
+            'del /q "%~f0" >nul 2>&1',
+            "",
+        ])
+        try:
+            script_path.write_text("\r\n".join(lines), encoding="utf-8")
+            creation_flags = 0
+            if hasattr(subprocess, "DETACHED_PROCESS"):
+                creation_flags |= subprocess.DETACHED_PROCESS
+            if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen(
+                ["cmd.exe", "/C", str(script_path)],
+                close_fds=True,
+                creationflags=creation_flags,
+            )
+            return True, "Source update launched"
+        except Exception as exc:
+            return False, f"Could not launch source update: {exc}"
 
     def _fetch_latest_commit(self, repo: str, branch: str) -> tuple[str | None, str | None]:
         url = f"{GITHUB_API_BASE}/repos/{repo}/commits/{branch}"
@@ -543,6 +635,12 @@ class OneSignAgent:
         logger.info("OneSign Agent starting on %s", HOSTNAME)
         self.tray.notify("OneSign Agent", "Starting up…", duration=3)
         self.sync_with_server()
+        if (
+            self.config.getboolean("ui", "fullscreen_shell_enabled", fallback=True)
+            and not is_workstation_locked()
+            and self.session_shell.available
+        ):
+            self.session_shell.show("Authenticated User", HOSTNAME)
 
         # Heartbeat thread
         t_hb = threading.Thread(target=self._heartbeat_loop, daemon=True)
@@ -562,6 +660,7 @@ class OneSignAgent:
 
     def stop(self):
         self._running = False
+        self.session_shell.stop()
         try:
             self.reader.disconnect()
         except Exception:
@@ -631,6 +730,7 @@ class OneSignAgent:
                         self.tray.notify("OneSign", "Badge tapped — locking workstation.", duration=3)
                         self.tray.set_status("locked", "OneSign — Workstation locked")
                         lock_workstation()
+                        self.session_shell.hide()
                         self._active_session_card = None
                     else:
                         # Workstation is locked — authenticate and unlock
@@ -725,39 +825,14 @@ class OneSignAgent:
             )
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
-            # Try credential provider pipe first (most reliable), fall back to
-            # external provider command, then to raw SendInput on the Winlogon desktop.
-            pipe_ok = unlock_via_credential_provider_pipe(username, password, domain)
-            if pipe_ok:
-                ok = True
-            else:
-                use_credential_provider = self.config.getboolean(
-                    "credential_provider", "enabled", fallback=False
-                )
-                if use_credential_provider:
-                    provider_command = self.config.get(
-                        "credential_provider", "command", fallback=""
-                    )
-                    provider_timeout = self.config.getint(
-                        "credential_provider", "timeout_seconds", fallback=20
-                    )
-                    ok = unlock_with_credential_provider(
-                        provider_command,
-                        username,
-                        password,
-                        domain,
-                        provider_timeout,
-                    )
-                    if not ok:
-                        logger.warning("Credential provider unlock failed, falling back to secure desktop SendInput flow")
-                        ok = unlock_workstation(username, password, domain)
-                else:
-                    ok = unlock_workstation(username, password, domain)
+            ok = unlock_workstation(username, password, domain)
 
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)
                 self.tray.set_status("connected")
                 return False
+            if self.config.getboolean("ui", "fullscreen_shell_enabled", fallback=True):
+                self.session_shell.show(fullname, HOSTNAME)
             return True
         elif resp.status_code == 401:
             logger.warning("Authentication failed due to API key issue")
