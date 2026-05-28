@@ -9,7 +9,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 
 namespace OneSign.CredentialProvider
 {
@@ -48,17 +47,7 @@ namespace OneSign.CredentialProvider
             _domain    = creds.Domain;
             _credReady = true;
 
-            // Notify LogonUI that credentials are ready.
-            // The call must be made on a background thread to avoid deadlocking
-            // LogonUI's message pump.  LogonUI will then call GetSerialization.
-            ThreadPool.QueueUserWorkItem(_ =>
-            {
-                try
-                {
-                    _events?.CredentialsChanged(_adviseContext);
-                }
-                catch { /* best-effort */ }
-            });
+            // The provider raises CredentialsChanged after delivering credentials.
         }
 
         // ── ICredentialProviderCredential ─────────────────────────────────────

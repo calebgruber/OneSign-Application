@@ -13,14 +13,14 @@ namespace OneSign.CredentialProvider
     // ── Supporting types ─────────────────────────────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct KERB_INTERACTIVE_UNLOCK_LOGON
+    public struct KERB_INTERACTIVE_UNLOCK_LOGON
     {
         public KERB_INTERACTIVE_LOGON Logon;
         public LUID LogonId;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct KERB_INTERACTIVE_LOGON
+    public struct KERB_INTERACTIVE_LOGON
     {
         public KERB_LOGON_SUBMIT_TYPE MessageType;
         public UNICODE_STRING LogonDomainName;
@@ -29,7 +29,7 @@ namespace OneSign.CredentialProvider
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct UNICODE_STRING
+    public struct UNICODE_STRING
     {
         public ushort Length;
         public ushort MaximumLength;
@@ -37,13 +37,13 @@ namespace OneSign.CredentialProvider
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct LUID
+    public struct LUID
     {
         public uint LowPart;
         public int  HighPart;
     }
 
-    internal enum KERB_LOGON_SUBMIT_TYPE
+    public enum KERB_LOGON_SUBMIT_TYPE
     {
         KerbInteractiveLogon            = 2,
         KerbWorkstationUnlockLogon      = 7,
@@ -51,7 +51,7 @@ namespace OneSign.CredentialProvider
         KerbCertificateUnlockLogon      = 18,
     }
 
-    internal enum CREDENTIAL_PROVIDER_USAGE_SCENARIO
+    public enum CREDENTIAL_PROVIDER_USAGE_SCENARIO
     {
         CPUS_INVALID            = 0,
         CPUS_LOGON              = 1,
@@ -61,7 +61,7 @@ namespace OneSign.CredentialProvider
         CPUS_PLAP               = 5,
     }
 
-    internal enum CREDENTIAL_PROVIDER_FIELD_TYPE
+    public enum CREDENTIAL_PROVIDER_FIELD_TYPE
     {
         CPFT_INVALID              = 0,
         CPFT_LARGE_TEXT           = 1,
@@ -75,7 +75,7 @@ namespace OneSign.CredentialProvider
         CPFT_SUBMIT_BUTTON        = 9,
     }
 
-    internal enum CREDENTIAL_PROVIDER_FIELD_STATE
+    public enum CREDENTIAL_PROVIDER_FIELD_STATE
     {
         CPFS_HIDDEN               = 0,
         CPFS_DISPLAY_IN_SELECTED_TILE   = 1,
@@ -83,7 +83,7 @@ namespace OneSign.CredentialProvider
         CPFS_DISPLAY_IN_BOTH            = 3,
     }
 
-    internal enum CREDENTIAL_PROVIDER_FIELD_INTERACTIVE_STATE
+    public enum CREDENTIAL_PROVIDER_FIELD_INTERACTIVE_STATE
     {
         CPFIS_NONE      = 0,
         CPFIS_READONLY  = 1,
@@ -92,7 +92,7 @@ namespace OneSign.CredentialProvider
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR
+    public struct CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR
     {
         public uint  dwFieldID;
         public CREDENTIAL_PROVIDER_FIELD_TYPE cpft;
@@ -101,14 +101,14 @@ namespace OneSign.CredentialProvider
         public Guid guidFieldType;
     }
 
-    internal enum NTSTATUS : uint
+    public enum NTSTATUS : uint
     {
         STATUS_SUCCESS              = 0x00000000,
         STATUS_NOT_IMPLEMENTED      = 0xC0000002,
         STATUS_INVALID_INFO_CLASS   = 0xC0000003,
     }
 
-    internal enum CREDENTIAL_PROVIDER_GET_SERIALIZATION_RESPONSE
+    public enum CREDENTIAL_PROVIDER_GET_SERIALIZATION_RESPONSE
     {
         CPGSR_NO_CREDENTIAL_NOT_FINISHED  = 0,
         CPGSR_NO_CREDENTIAL_FINISHED      = 1,
@@ -117,7 +117,7 @@ namespace OneSign.CredentialProvider
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct CREDENTIAL_PROVIDER_CREDENTIAL_SERIALIZATION
+    public struct CREDENTIAL_PROVIDER_CREDENTIAL_SERIALIZATION
     {
         public uint ulAuthenticationPackage;
         public Guid clsidCredentialProvider;
@@ -130,7 +130,7 @@ namespace OneSign.CredentialProvider
     [ComImport]
     [Guid("d545db01-e522-4a63-af83-d8ddf954004d")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICredentialProvider
+    public interface ICredentialProvider
     {
         [PreserveSig] int SetUsageScenario(CREDENTIAL_PROVIDER_USAGE_SCENARIO cpus, uint dwFlags);
         [PreserveSig] int SetSerialization(ref CREDENTIAL_PROVIDER_CREDENTIAL_SERIALIZATION pcpcs);
@@ -147,7 +147,7 @@ namespace OneSign.CredentialProvider
     [ComImport]
     [Guid("b63b6cb8-1d68-49ea-8b2e-6c34343fc37b")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICredentialProviderEvents
+    public interface ICredentialProviderEvents
     {
         [PreserveSig] int CredentialsChanged([MarshalAs(UnmanagedType.SysUInt)] IntPtr upAdviseContext);
     }
@@ -157,7 +157,7 @@ namespace OneSign.CredentialProvider
     [ComImport]
     [Guid("63913a93-40c1-481a-818d-4072ff8c70cc")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICredentialProviderCredential
+    public interface ICredentialProviderCredential
     {
         [PreserveSig] int Advise(ICredentialProviderCredentialEvents pcpce);
         [PreserveSig] int UnAdvise();
@@ -183,7 +183,7 @@ namespace OneSign.CredentialProvider
     [ComImport]
     [Guid("dbc6fb30-c843-49e3-a645-573e6f39446a")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICredentialProviderCredentialEvents
+    public interface ICredentialProviderCredentialEvents
     {
         [PreserveSig] int SetFieldState(ICredentialProviderCredential pcpc, uint dwFieldID, CREDENTIAL_PROVIDER_FIELD_STATE cpfs);
         [PreserveSig] int SetFieldInteractiveState(ICredentialProviderCredential pcpc, uint dwFieldID, CREDENTIAL_PROVIDER_FIELD_INTERACTIVE_STATE cpfis);

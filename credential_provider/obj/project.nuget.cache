@@ -1,11 +1,20 @@
 {
   "version": 2,
-  "dgSpecHash": "Ewn6QmElN+g=",
+  "dgSpecHash": "Om+0qaLTzJQ=",
   "success": true,
   "projectFilePath": "/tmp/workspace/calebgruber/OneSign-Application/credential_provider/OneSignCredentialProvider.csproj",
   "expectedPackageFiles": [
-    "/home/runner/.nuget/packages/microsoft.netframework.referenceassemblies/1.0.3/microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
-    "/home/runner/.nuget/packages/microsoft.netframework.referenceassemblies.net48/1.0.3/microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/microsoft.bcl.asyncinterfaces/8.0.0/microsoft.bcl.asyncinterfaces.8.0.0.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/microsoft.netframework.referenceassemblies/1.0.3/microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/microsoft.netframework.referenceassemblies.net48/1.0.3/microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.buffers/4.5.1/system.buffers.4.5.1.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.memory/4.5.5/system.memory.4.5.5.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.numerics.vectors/4.5.0/system.numerics.vectors.4.5.0.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.text.encodings.web/8.0.0/system.text.encodings.web.8.0.0.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.text.json/8.0.5/system.text.json.8.0.5.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.threading.tasks.extensions/4.5.4/system.threading.tasks.extensions.4.5.4.nupkg.sha512",
+    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/system.valuetuple/4.5.0/system.valuetuple.4.5.0.nupkg.sha512"
   ],
   "logs": []
 }

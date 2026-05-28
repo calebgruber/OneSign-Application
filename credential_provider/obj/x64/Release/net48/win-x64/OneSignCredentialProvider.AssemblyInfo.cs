@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute("Copyright © OneSign")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a6286ca0ecdcd879971fbf19dd5fa64758a2f00")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+aad87b74f1a3bcdf827e1e607a07ac730bca520d")]
 [assembly: System.Reflection.AssemblyProductAttribute("OneSignCredentialProvider")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OneSign Windows Credential Provider")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

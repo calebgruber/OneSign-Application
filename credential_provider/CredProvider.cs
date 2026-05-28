@@ -162,6 +162,14 @@ namespace OneSign.CredentialProvider
         private void OnCredentialsReceived(object? sender, AgentCredentials creds)
         {
             _tile?.DeliverCredentials(creds);
+            try
+            {
+                _providerEvents?.CredentialsChanged(_adviseContext);
+            }
+            catch
+            {
+                // Best effort; LogonUI will request state on next refresh cycle.
+            }
         }
 
         // ── Auth package resolution ───────────────────────────────────────────
