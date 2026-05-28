@@ -14,6 +14,20 @@
           "build/Microsoft.NETFramework.ReferenceAssemblies.net48.targets": {}
         }
       }
+    },
+    "net48/win-x64": {
+      "Microsoft.NETFramework.ReferenceAssemblies/1.0.3": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.NETFramework.ReferenceAssemblies.net48": "1.0.3"
+        }
+      },
+      "Microsoft.NETFramework.ReferenceAssemblies.net48/1.0.3": {
+        "type": "package",
+        "build": {
+          "build/Microsoft.NETFramework.ReferenceAssemblies.net48.targets": {}
+        }
+      }
     }
   },
   "libraries": {
@@ -415,7 +429,7 @@
     ]
   },
   "packageFolders": {
-    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages": {}
+    "/home/runner/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
@@ -423,7 +437,7 @@
       "projectUniqueName": "/tmp/workspace/calebgruber/OneSign-Application/credential_provider/OneSignCredentialProvider.csproj",
       "projectName": "OneSignCredentialProvider",
       "projectPath": "/tmp/workspace/calebgruber/OneSign-Application/credential_provider/OneSignCredentialProvider.csproj",
-      "packagesPath": "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages",
+      "packagesPath": "/home/runner/.nuget/packages/",
       "outputPath": "/tmp/workspace/calebgruber/OneSign-Application/credential_provider/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
@@ -467,6 +481,11 @@
           }
         },
         "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.300/RuntimeIdentifierGraph.json"
+      }
+    },
+    "runtimes": {
+      "win-x64": {
+        "#import": []
       }
     }
   }

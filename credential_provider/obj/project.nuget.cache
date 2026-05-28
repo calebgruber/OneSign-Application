@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "HDPrrp2kVjg=",
+  "dgSpecHash": "Ewn6QmElN+g=",
   "success": true,
   "projectFilePath": "/tmp/workspace/calebgruber/OneSign-Application/credential_provider/OneSignCredentialProvider.csproj",
   "expectedPackageFiles": [
-    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/microsoft.netframework.referenceassemblies/1.0.3/microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
-    "/tmp/codeql-scratch-0040a3dd4c4c122a/dbs/csharp/working/packages/microsoft.netframework.referenceassemblies.net48/1.0.3/microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+    "/home/runner/.nuget/packages/microsoft.netframework.referenceassemblies/1.0.3/microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.netframework.referenceassemblies.net48/1.0.3/microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
   ],
   "logs": []
 }
