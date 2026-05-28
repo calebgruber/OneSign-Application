@@ -426,7 +426,7 @@ class OneSignAgent:
             return False, "Source update build script not found"
 
         if getattr(sys, "frozen", False):
-            restart_cmd = f'start "" "{sys.executable}"'
+            restart_cmd = f'start "" "{sys.executable}" "{self._config_path}"'
         else:
             restart_cmd = (
                 f'start "" "{sys.executable}" '
@@ -456,6 +456,7 @@ class OneSignAgent:
             lines.extend([
                 'if exist "dist\\OneSignAgent.exe" (',
                 '  taskkill /f /im OneSignAgent.exe >nul 2>&1',
+                "  timeout /t 2 /nobreak >nul",
                 f'  copy /y "dist\\OneSignAgent.exe" "{Path(sys.executable)}" >nul 2>&1',
                 ")",
             ])
@@ -741,13 +742,22 @@ class OneSignAgent:
                 else:
                     locked = is_workstation_locked()
                     if not locked:
-                        # Workstation is already unlocked — any tap locks it (tap-out)
-                        logger.info("Tap-out: workstation unlocked, locking for card %s", card_hex)
-                        self.tray.notify("OneSign", "Badge tapped — locking workstation.", duration=3)
-                        self.tray.set_status("locked", "OneSign — Workstation locked")
-                        lock_workstation()
-                        self.session_shell.hide()
-                        self._active_session_card = None
+                        if self._active_session_card and card_hex == self._active_session_card:
+                            logger.info("Tap-out: workstation unlocked, locking for card %s", card_hex)
+                            self.tray.notify("OneSign", "Badge tapped — locking workstation.", duration=3)
+                            self.tray.set_status("locked", "OneSign — Workstation locked")
+                            lock_workstation()
+                            self.session_shell.hide()
+                            self._active_session_card = None
+                        else:
+                            logger.info("Tap switch-user: locking and authenticating card %s", card_hex)
+                            lock_workstation()
+                            time.sleep(0.5)
+                            auth_ok = self._handle_auth(card_hex)
+                            if auth_ok:
+                                self._active_session_card = card_hex
+                            else:
+                                self._active_session_card = None
                     else:
                         # Workstation is locked — authenticate and unlock
                         auth_ok = self._handle_auth(card_hex)
