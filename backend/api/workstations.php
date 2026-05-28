@@ -21,11 +21,11 @@ try {
 
         if (!$apcuAvailable) {
             jsonResponse([
-                'ok' => false,
+                'ok' => true,
                 'requested' => 0,
                 'requested_at' => null,
                 'ping_supported' => false,
-                'message' => 'APCu is not available for workstation ping checks',
+                'message' => 'Live ping checks are disabled because APCu is not installed',
             ]);
         }
 

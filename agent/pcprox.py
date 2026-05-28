@@ -54,6 +54,7 @@ class PcProxReader:
         self._dev_id = ctypes.c_long(0)
         self._connected = False
         self._usb_connect = None
+        self._usb_connect_name = ""
         self._usb_disconnect = None
         self._get_active_id = None
         self._set_dev_type_srch = None
@@ -84,9 +85,12 @@ class PcProxReader:
 
         self._declare_functions()
 
-        self._configure_device_search()
-
+        self._set_dev_type_search(0)
         result = self._call_usb_connect()
+        if result != 1:
+            # Fallback: broaden search to both USB and serial, matching RF IDeas sample guidance.
+            self._set_dev_type_search(-1)
+            result = self._call_usb_connect()
         if result != 1:
             raise PcProxError(f"USBConnect failed (returned {result})")
 
@@ -208,7 +212,7 @@ class PcProxReader:
         """Set ctypes argtypes/restype for each DLL function."""
         lib = self._lib
 
-        self._usb_connect = self._pick_function(('USBConnect', 'usbConnect'))
+        self._usb_connect_name, self._usb_connect = self._pick_function_with_name(('USBConnect', 'usbConnect'))
         self._usb_disconnect = self._pick_function(('USBDisconnect', 'usbDisconnect'))
         self._get_active_id = self._pick_function(('GetActiveID', 'getActiveID'))
         self._set_dev_type_srch = self._pick_function(('SetDevTypeSrch',))
@@ -222,6 +226,7 @@ class PcProxReader:
         if self._usb_connect is None or self._usb_disconnect is None or self._get_active_id is None:
             raise PcProxError("Required pcProx API functions not found in DLL")
 
+        self._usb_connect.argtypes = []
         self._usb_connect.restype = ctypes.c_short
         self._usb_disconnect.restype = ctypes.c_short
         self._get_active_id.argtypes = [
@@ -251,26 +256,27 @@ class PcProxReader:
                 return getattr(self._lib, name)
         return None
 
-    def _configure_device_search(self):
-        # Search for USB HID pcProx devices.
+    def _pick_function_with_name(self, names: tuple[str, ...]):
+        for name in names:
+            if hasattr(self._lib, name):
+                return name, getattr(self._lib, name)
+        return "", None
+
+    def _set_dev_type_search(self, device_type: int):
         if self._set_dev_type_srch is not None:
             try:
-                self._set_dev_type_srch(ctypes.c_short(0))
+                self._set_dev_type_srch.restype = ctypes.c_short
+                self._set_dev_type_srch.argtypes = [ctypes.c_short]
+                self._set_dev_type_srch(ctypes.c_short(device_type))
             except TypeError:
-                self._set_dev_type_srch(ctypes.c_ubyte(0))
-        if self._set_connect_product is not None:
-            try:
-                self._set_connect_product(ctypes.c_short(0))
-            except TypeError:
-                self._set_connect_product(ctypes.c_ubyte(0))
+                self._set_dev_type_srch.argtypes = [ctypes.c_ubyte]
+                self._set_dev_type_srch(ctypes.c_ubyte(device_type))
 
     def _call_usb_connect(self) -> int:
-        try:
-            self._usb_connect.argtypes = [ctypes.POINTER(ctypes.c_long)]
-            return int(self._usb_connect(ctypes.byref(self._dev_id)))
-        except TypeError:
-            self._usb_connect.argtypes = []
-            return int(self._usb_connect())
+        # RF IDeas sample uses no-argument usbConnect/USBConnect.
+        # Keep this exact call shape for broadest compatibility.
+        self._usb_connect.argtypes = []
+        return int(self._usb_connect())
 
     def _call_get_active_id(self, buffer):
         return int(self._get_active_id(buffer, ctypes.c_ubyte(CARD_DATA_LEN)))
