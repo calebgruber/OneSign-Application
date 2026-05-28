@@ -73,7 +73,7 @@ mysql -u onesign -p onesign < backend/setup.sql
    </Directory>
    ```
 4. Browse to `http://YOUR_SERVER/onesign/` → redirects to admin login.
-   - Default credentials: **admin / password** — **change immediately!**
+   - Default credentials: **admin / Admin1234!** — **change immediately!**
 
 ### 3. Admin Panel First Steps
 
@@ -135,7 +135,8 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 |--------|--------|
 | Tap badge on reader (locked screen) | Unlocks workstation and logs in |
 | Tap badge (already logged in) | No action (already authenticated) |
-| Remove badge | Locks workstation after configured delay |
+| Tap same badge again (while signed in) | Locks workstation (tap-out) |
+| Tap a different enrolled badge | Switches/signs in as that mapped user |
 | Tap unregistered badge | Balloon: "Badge not enrolled" |
 | Tap disabled badge | Balloon: "Access denied" |
 
@@ -154,8 +155,8 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[reader] dll_path` | `C:\Program Files\OneSign Agent\pcProxAPI64.dll` | Path to pcProx DLL |
 | `[reader] poll_interval_ms` | `250` | Card polling interval |
 | `[reader] active_device_index` | `-1` | Reader index to use when multiple readers are connected |
-| `[behavior] lock_on_remove` | `true` | Lock on badge removal |
-| `[behavior] lock_delay_seconds` | `5` | Seconds before locking |
+| `[behavior] lock_on_remove` | `true` | Legacy option (tap-in/tap-out flow is preferred for pcProx readers) |
+| `[behavior] lock_delay_seconds` | `5` | Legacy delay option used with remove-based lock behavior |
 | `[behavior] heartbeat_interval` | `30` | Heartbeat period (seconds) |
 | `[credential_provider] enabled` | `false` | Use external credential provider helper for unlocks |
 | `[credential_provider] command` | *(empty)* | Command to invoke helper (receives JSON creds on stdin) |
