@@ -212,9 +212,13 @@ class PcProxReader:
         """Set ctypes argtypes/restype for each DLL function."""
         lib = self._lib
 
-        self._usb_connect_name, self._usb_connect = self._pick_function_with_name(('USBConnect', 'usbConnect'))
-        self._usb_disconnect = self._pick_function(('USBDisconnect', 'usbDisconnect'))
-        self._get_active_id = self._pick_function(('GetActiveID', 'getActiveID'))
+        # Prefer lowercase names (RF IDeas sample style): these are the no-argument
+        # forms.  The capitalized USBConnect/USBDisconnect variants may take a
+        # long *pDevID pointer; calling them with argtypes=[] causes an access
+        # violation as the DLL tries to dereference the missing pointer argument.
+        self._usb_connect_name, self._usb_connect = self._pick_function_with_name(('usbConnect', 'USBConnect'))
+        self._usb_disconnect = self._pick_function(('usbDisconnect', 'USBDisconnect'))
+        self._get_active_id = self._pick_function(('getActiveID', 'GetActiveID'))
         self._set_dev_type_srch = self._pick_function(('SetDevTypeSrch',))
         self._set_connect_product = self._pick_function(('SetConnectProduct',))
         self._get_dev_cnt = self._pick_function(('GetDevCnt',))
