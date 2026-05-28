@@ -389,6 +389,17 @@ class OneSignAgent:
         except Exception:
             return ""
 
+    def _safe_temp_subdir(self, *parts: str) -> Path | None:
+        try:
+            temp_root = Path(tempfile.gettempdir()).resolve()
+            candidate = temp_root.joinpath(*parts).resolve()
+            if candidate == temp_root or temp_root in candidate.parents:
+                candidate.mkdir(parents=True, exist_ok=True)
+                return candidate
+        except Exception:
+            return None
+        return None
+
     def _can_run_source_update(self) -> bool:
         if not self.config.getboolean("updates", "source_update_enabled", fallback=True):
             return False
@@ -422,8 +433,10 @@ class OneSignAgent:
                 f'"{agent_dir / "onesign_agent.py"}" "{self._config_path}"'
             )
 
-        script_path = Path(tempfile.gettempdir()) / "OneSign" / "updates" / "run_onesign_source_update.cmd"
-        script_path.parent.mkdir(parents=True, exist_ok=True)
+        update_dir = self._safe_temp_subdir("OneSign", "updates")
+        if update_dir is None:
+            return False, "Could not prepare update directory"
+        script_path = update_dir / "run_onesign_source_update.cmd"
 
         lines = [
             "@echo off",
@@ -513,8 +526,9 @@ class OneSignAgent:
         if parsed.scheme.lower() != "https":
             return None, "Installer URL must use HTTPS"
 
-        update_dir = Path(tempfile.gettempdir()) / "OneSign" / "updates"
-        update_dir.mkdir(parents=True, exist_ok=True)
+        update_dir = self._safe_temp_subdir("OneSign", "updates")
+        if update_dir is None:
+            return None, "Could not prepare update directory"
         dest_path = update_dir / "OneSignAgentSetup-latest.exe"
 
         try:
@@ -547,8 +561,10 @@ class OneSignAgent:
         if not os.path.isfile(installer_path):
             return False, "Downloaded installer was not found"
 
-        script_path = Path(tempfile.gettempdir()) / "OneSign" / "updates" / "run_onesign_update.cmd"
-        script_path.parent.mkdir(parents=True, exist_ok=True)
+        update_dir = self._safe_temp_subdir("OneSign", "updates")
+        if update_dir is None:
+            return False, "Could not prepare update directory"
+        script_path = update_dir / "run_onesign_update.cmd"
         install_cmd = f'"{installer_path}"'
         if _is_elevated():
             install_cmd = (
