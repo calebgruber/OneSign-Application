@@ -19,6 +19,7 @@ import logging
 import logging.handlers
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -44,6 +45,7 @@ from win_login import (
     lock_workstation,
     unlock_workstation,
     unlock_with_credential_provider,
+    unlock_via_credential_provider_pipe,
     is_workstation_locked,
 )
 from tray_app  import TrayApp
@@ -211,7 +213,18 @@ class OneSignAgent:
         raw = self.config.get("server", "url", fallback="http://localhost").strip()
         if not raw or "YOUR_SERVER" in raw.upper():
             return "http://localhost"
-        return raw.rstrip("/")
+        url = raw.rstrip("/")
+        # Repair missing colon in scheme separator (e.g. "http//..." → "http://...")
+        url = re.sub(r'^(https?)//+', r'\1://', url, flags=re.IGNORECASE)
+        # If still no valid scheme, prepend http://
+        if not re.match(r'^https?://', url, re.IGNORECASE):
+            url = "http://" + url
+        if url != raw.rstrip("/"):
+            logger.warning(
+                "Corrected malformed server URL %r → %r — please fix [server] url in config.ini",
+                raw, url,
+            )
+        return url
 
     def get_admin_url(self) -> str:
         base = self.get_server_base_url()
@@ -221,6 +234,22 @@ class OneSignAgent:
 
     def get_log_file_path(self) -> str | None:
         return str(LOG_FILE) if LOG_FILE else None
+
+    def clear_log(self) -> tuple[bool, str]:
+        """Truncate the agent log file."""
+        if not LOG_FILE or not LOG_FILE.is_file():
+            return False, "No log file found"
+        try:
+            for handler in logging.root.handlers:
+                try:
+                    handler.flush()
+                except Exception:
+                    pass
+            LOG_FILE.write_text("", encoding="utf-8")
+            logger.info("Log file cleared by user")
+            return True, "Log cleared"
+        except Exception as exc:
+            return False, f"Could not clear log: {exc}"
 
     def get_status_summary(self) -> str:
         reader_state = "Connected" if self._reader_connected else "Disconnected"
@@ -595,16 +624,16 @@ class OneSignAgent:
                 if self._enrollment_mode:
                     self._handle_enroll(card_hex, self._pending_enroll_token)
                 else:
-                    if (
-                        self._active_session_card == card_hex
-                        and not is_workstation_locked()
-                    ):
-                        logger.info("Tap-out detected for %s; locking workstation", card_hex)
-                        self.tray.notify("OneSign", "Badge tapped again — locking workstation.", duration=3)
+                    locked = is_workstation_locked()
+                    if not locked:
+                        # Workstation is already unlocked — any tap locks it (tap-out)
+                        logger.info("Tap-out: workstation unlocked, locking for card %s", card_hex)
+                        self.tray.notify("OneSign", "Badge tapped — locking workstation.", duration=3)
                         self.tray.set_status("locked", "OneSign — Workstation locked")
                         lock_workstation()
                         self._active_session_card = None
                     else:
+                        # Workstation is locked — authenticate and unlock
                         auth_ok = self._handle_auth(card_hex)
                         if auth_ok:
                             self._active_session_card = card_hex
@@ -629,6 +658,12 @@ class OneSignAgent:
         if pending_token:
             first_detect = pending_token != self._pending_enroll_token
             self._pending_enroll_token = pending_token
+            if not self._enrollment_mode:
+                # Just entered enrollment mode — clear tracked card state so the
+                # very next badge tap is processed as an enroll event even if the
+                # same card was already on the reader before enrollment started.
+                self._last_card_hex = None
+                self._tap_rearmed = True
             self._enrollment_mode = True
             if first_detect:
                 logger.info("Enrollment request received for workstation %s", HOSTNAME)
@@ -690,28 +725,34 @@ class OneSignAgent:
             )
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
-            use_credential_provider = self.config.getboolean(
-                "credential_provider", "enabled", fallback=False
-            )
-            if use_credential_provider:
-                provider_command = self.config.get(
-                    "credential_provider", "command", fallback=""
-                )
-                provider_timeout = self.config.getint(
-                    "credential_provider", "timeout_seconds", fallback=20
-                )
-                ok = unlock_with_credential_provider(
-                    provider_command,
-                    username,
-                    password,
-                    domain,
-                    provider_timeout,
-                )
-                if not ok:
-                    logger.warning("Credential provider unlock failed, falling back to secure desktop SendInput flow")
-                    ok = unlock_workstation(username, password, domain)
+            # Try credential provider pipe first (most reliable), fall back to
+            # external provider command, then to raw SendInput on the Winlogon desktop.
+            pipe_ok = unlock_via_credential_provider_pipe(username, password, domain)
+            if pipe_ok:
+                ok = True
             else:
-                ok = unlock_workstation(username, password, domain)
+                use_credential_provider = self.config.getboolean(
+                    "credential_provider", "enabled", fallback=False
+                )
+                if use_credential_provider:
+                    provider_command = self.config.get(
+                        "credential_provider", "command", fallback=""
+                    )
+                    provider_timeout = self.config.getint(
+                        "credential_provider", "timeout_seconds", fallback=20
+                    )
+                    ok = unlock_with_credential_provider(
+                        provider_command,
+                        username,
+                        password,
+                        domain,
+                        provider_timeout,
+                    )
+                    if not ok:
+                        logger.warning("Credential provider unlock failed, falling back to secure desktop SendInput flow")
+                        ok = unlock_workstation(username, password, domain)
+                else:
+                    ok = unlock_workstation(username, password, domain)
 
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)

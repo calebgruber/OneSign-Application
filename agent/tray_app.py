@@ -178,6 +178,7 @@ class TrayApp:
             pystray.MenuItem("Check for Updates", self._on_check_updates),
             pystray.MenuItem("Show Connection Status", self._on_status),
             pystray.MenuItem("Open Agent Log", self._on_open_log),
+            pystray.MenuItem("Clear Agent Log…", self._on_clear_log),
             pystray.MenuItem("Open Admin Panel", self._on_open_admin),
             pystray.MenuItem("Enroll Card…",     self._on_enroll),
             pystray.MenuItem("Reader Control…",  self._on_reader_control),
@@ -245,6 +246,16 @@ class TrayApp:
                 subprocess.Popen(["notepad.exe", log_path], close_fds=True)
             except Exception as exc:
                 self.notify("OneSign Log Error", f"Could not open log file: {exc}", duration=6)
+
+    def _on_clear_log(self, icon, item):
+        if not self._agent:
+            self.notify("OneSign Log", "Agent context is unavailable.", duration=5)
+            return
+        ok, msg = self._agent.clear_log()
+        if ok:
+            self.notify("OneSign Log", "Log file cleared successfully.", duration=4)
+        else:
+            self.notify("OneSign Log — Error", msg, duration=6)
 
     def _on_open_admin(self, icon, item):
         import webbrowser

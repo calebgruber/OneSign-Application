@@ -23,10 +23,13 @@ import ctypes.wintypes
 import json
 import logging
 import shlex
+import struct
 import subprocess
 import time
 
 logger = logging.getLogger(__name__)
+
+ONESIGN_PIPE_NAME = r"\\.\pipe\OneSignCredProvider"
 
 # ── Win32 constants ─────────────────────────────────────────────────────────
 WM_KEYDOWN      = 0x0100
@@ -85,6 +88,69 @@ def _type_string(text: str, delay_ms: int = 20):
     for ch in text:
         _send_unicode_char(ch)
         time.sleep(delay_ms / 1000.0)
+
+
+def unlock_via_credential_provider_pipe(username: str, password: str, domain: str = '.') -> bool:
+    r"""
+    Send credentials to the OneSign Windows Credential Provider DLL via
+    the named pipe \\.\pipe\OneSignCredProvider.
+
+    The credential provider (if installed and running in LogonUI) reads the
+    JSON payload and submits credentials to Windows through the proper
+    ICredentialProvider::GetSerialization path, which is the most reliable
+    and secure unlock mechanism.
+
+    Returns True if the message was successfully written to the pipe.
+    A True return does NOT guarantee the workstation unlocked — it means
+    the credentials were handed off to the provider DLL successfully.
+    """
+    payload = json.dumps({
+        "username": username,
+        "password": password,
+        "domain": domain,
+    }).encode("utf-8")
+    # 4-byte little-endian length prefix followed by JSON body
+    message = struct.pack("<I", len(payload)) + payload
+
+    GENERIC_WRITE = 0x40000000
+    OPEN_EXISTING = 3
+    INVALID_HANDLE_VALUE = ctypes.wintypes.HANDLE(-1).value
+
+    try:
+        h = ctypes.windll.kernel32.CreateFileW(
+            ONESIGN_PIPE_NAME,
+            GENERIC_WRITE,
+            0,
+            None,
+            OPEN_EXISTING,
+            0,
+            None,
+        )
+        if h == INVALID_HANDLE_VALUE:
+            err = ctypes.GetLastError()
+            logger.debug("Credential provider pipe not available (err=%d); will use SendInput fallback", err)
+            return False
+
+        written = ctypes.c_ulong(0)
+        ok = ctypes.windll.kernel32.WriteFile(
+            h,
+            message,
+            len(message),
+            ctypes.byref(written),
+            None,
+        )
+        ctypes.windll.kernel32.CloseHandle(h)
+
+        if ok and written.value == len(message):
+            logger.info("Credentials sent to OneSign credential provider pipe for user '%s'", username)
+            return True
+
+        logger.debug("Pipe write incomplete (wrote %d/%d bytes)", written.value, len(message))
+        return False
+    except Exception as exc:
+        logger.debug("Credential provider pipe error: %s", exc)
+        return False
+
 
 
 def lock_workstation() -> bool:
