@@ -130,6 +130,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 let livePoller = null;
+let liveEnrollToken = null;
 
 async function enrollManual() {
   const userId = document.getElementById('manualUser').value;
@@ -164,6 +165,12 @@ async function startLiveEnroll() {
     body: JSON.stringify({ user_id: parseInt(userId, 10), workstation_id: wsId }),
   });
   if (!r.ok) { alert('Failed to start enrollment.'); return; }
+  const startData = await r.json();
+  if (!startData?.token) {
+    alert('Enrollment started but no token was returned.');
+    return;
+  }
+  liveEnrollToken = String(startData.token);
 
   document.getElementById('startLiveBtn').classList.add('d-none');
   document.getElementById('liveStatus').classList.remove('d-none');
@@ -174,14 +181,17 @@ async function startLiveEnroll() {
   livePoller = setInterval(async () => {
     attempts++;
     if (attempts > 30) { cancelLiveEnroll(); return; }
-    const evRes = await fetch('../api/audit.php?type=card_enrolled&limit=3');
-    const events = await evRes.json();
-    if (events.length && (Date.now() - new Date(events[0].created_at).getTime()) < 15000) {
+    if (!liveEnrollToken) return;
+    const pollRes = await fetch(`../api/enroll.php?result_token=${encodeURIComponent(liveEnrollToken)}`);
+    if (!pollRes.ok) return;
+    const poll = await pollRes.json();
+    if (poll && poll.pending === false && poll.ok && poll.card_id) {
       clearInterval(livePoller);
       document.getElementById('liveStatus').classList.add('d-none');
       document.getElementById('startLiveBtn').classList.remove('d-none');
       document.getElementById('liveResult').innerHTML =
-        `<div class="alert alert-success"><i class="ti ti-check me-1"></i>Card enrolled: <code>${escHtml(events[0].card_id || '')}</code></div>`;
+        `<div class="alert alert-success"><i class="ti ti-check me-1"></i>Card enrolled: <code>${escHtml(poll.card_id)}</code></div>`;
+      liveEnrollToken = null;
     }
   }, 2000);
 }
@@ -190,6 +200,7 @@ function cancelLiveEnroll() {
   clearInterval(livePoller);
   document.getElementById('liveStatus').classList.add('d-none');
   document.getElementById('startLiveBtn').classList.remove('d-none');
+  liveEnrollToken = null;
 }
 </script>
 

@@ -18,6 +18,23 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // Agent polling - API key auth
 if ($method === 'GET') {
+    $resultToken = trim($_GET['result_token'] ?? '');
+    if ($resultToken !== '') {
+        requireAdminLogin();
+        $result = runtimeStoreGet("enroll_result_$resultToken");
+        if (!$result) {
+            jsonResponse(['ok' => false, 'pending' => true]);
+        }
+        jsonResponse([
+            'ok' => (bool)($result['ok'] ?? false),
+            'pending' => false,
+            'card_id' => strtoupper((string)($result['card_id'] ?? '')),
+            'workstation' => (string)($result['workstation'] ?? ''),
+            'user_id' => (int)($result['user_id'] ?? 0),
+            'message' => (string)($result['message'] ?? ''),
+        ]);
+    }
+
     if (!authenticateApiKey()) { jsonResponse(['error' => 'Unauthorized'], 401); }
     // Check if there's a pending enrollment token for this workstation
     $workstation = trim($_GET['workstation'] ?? '');
@@ -53,6 +70,7 @@ if ($method === 'POST') {
     runtimeStoreSet("enroll_pending_$workstation", $token, 300);
     runtimeStoreSet("enroll_user_$token", $userId, 300);
     runtimeStoreSet("enroll_workstation_$token", $workstation, 300);
+    runtimeStoreDelete("enroll_result_$token");
     jsonResponse(['token' => $token, 'ok' => true, 'workstation' => $workstation]);
 }
 
@@ -77,6 +95,14 @@ if ($method === 'PUT') {
     db()->prepare('INSERT INTO cards (user_id, card_id, card_label, enrolled_by) VALUES (?,?,?,?)')
         ->execute([$userId, $cardId, 'Badge Card', 'agent']);
     $newId = db()->lastInsertId();
+
+    runtimeStoreSet("enroll_result_$token", [
+        'ok' => true,
+        'card_id' => $cardId,
+        'workstation' => (string)($workstation ?? ''),
+        'user_id' => (int)$userId,
+        'message' => 'Card enrolled',
+    ], 300);
 
     runtimeStoreDelete("enroll_user_$token");
     runtimeStoreDelete("enroll_workstation_$token");

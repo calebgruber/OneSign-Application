@@ -26,6 +26,7 @@ _DEFAULT_DLL_64 = r"C:\Program Files\RF IDeas\pcProx\pcProxAPI64.dll"
 _DEFAULT_DLL_32 = r"C:\Program Files\RF IDeas\pcProx\pcProxAPI.dll"
 
 CARD_DATA_LEN = 8  # standard card ID byte length
+CARD_DATA32_BUFFER_LEN = 32  # matches RF IDeas readercomm.py sample
 
 
 class PcProxError(Exception):
@@ -61,6 +62,7 @@ class PcProxReader:
         self._set_connect_product = None
         self._get_dev_cnt = None
         self._set_act_dev = None
+        self._get_active_id32 = None
         self._get_part_number_string = None
         self._get_vid_pid_vendor_name = None
         self._get_luid = None
@@ -149,6 +151,10 @@ class PcProxReader:
         if not self._connected or not self._lib:
             return None
 
+        card32 = self._read_active_id32()
+        if card32:
+            return card32
+
         buf = (ctypes.c_ubyte * CARD_DATA_LEN)()
         n = self._call_get_active_id(buf)
 
@@ -161,6 +167,37 @@ class PcProxReader:
             return None
 
         return card_bytes
+
+    def _read_active_id32(self) -> bytes | None:
+        """
+        Read ID using GetActiveID32 (same API used by RF IDeas readercomm.py).
+        Returns card bytes in the same byte order produced by the sample.
+        """
+        if self._get_active_id32 is None:
+            return None
+
+        raw_buf = (ctypes.c_ubyte * CARD_DATA32_BUFFER_LEN)()
+        buffer_size = ctypes.c_short(CARD_DATA32_BUFFER_LEN)
+
+        # readercomm.py sleeps before calling GetActiveID32
+        import time
+        time.sleep(0.25)
+
+        bits = int(self._get_active_id32(raw_buf, buffer_size))
+        if bits <= 0:
+            return None
+
+        bytes_to_read = (bits + 7) // 8
+        if bytes_to_read < CARD_DATA_LEN:
+            bytes_to_read = CARD_DATA_LEN
+        if bytes_to_read > CARD_DATA32_BUFFER_LEN:
+            bytes_to_read = CARD_DATA32_BUFFER_LEN
+
+        # Match readercomm.py output ordering: each byte is prepended.
+        ordered = bytes(reversed(bytes(raw_buf[:bytes_to_read])))
+        if not ordered or all(b == 0 for b in ordered):
+            return None
+        return ordered
 
     def get_card_hex(self) -> str | None:
         """Return the card ID as an uppercase hex string, or None."""
@@ -223,6 +260,7 @@ class PcProxReader:
         self._set_connect_product = self._pick_function(('SetConnectProduct',))
         self._get_dev_cnt = self._pick_function(('GetDevCnt',))
         self._set_act_dev = self._pick_function(('SetActDev', 'SetActiveDev'))
+        self._get_active_id32 = self._pick_function(('GetActiveID32', 'getActiveID32'))
         self._get_part_number_string = self._pick_function(('getPartNumberString', 'GetPartNumberString'))
         self._get_vid_pid_vendor_name = self._pick_function(('GetVidPidVendorName',))
         self._get_luid = self._pick_function(('GetLUID',))
@@ -238,6 +276,12 @@ class PcProxReader:
             ctypes.c_ubyte,
         ]
         self._get_active_id.restype = ctypes.c_int
+        if self._get_active_id32 is not None:
+            self._get_active_id32.argtypes = [
+                ctypes.POINTER(ctypes.c_ubyte),
+                ctypes.c_short,
+            ]
+            self._get_active_id32.restype = ctypes.c_short
 
         if self._set_dev_type_srch is not None:
             self._set_dev_type_srch.restype = ctypes.c_short
