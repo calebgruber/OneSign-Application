@@ -87,18 +87,20 @@ try {
         $requestedAt = runtimeStoreGet("ws_ping_request_$hostname");
         $ackedAt = runtimeStoreGet("ws_ping_ack_$hostname");
 
-        if ($requestedAt !== null) {
-            $r['ping_requested_at'] = (int)$requestedAt;
+        if ($requestedAt !== null || $ackedAt !== null) {
+            if ($requestedAt !== null) {
+                $r['ping_requested_at'] = (int)$requestedAt;
+            }
             if ($ackedAt !== null) {
                 $r['ping_acked_at'] = (int)$ackedAt;
             }
 
-            if ($ackedAt !== null && (int)$ackedAt >= (int)$requestedAt) {
+            if ($ackedAt !== null && ($requestedAt === null || (int)$ackedAt >= (int)$requestedAt)) {
                 $r['ping_state'] = 'ack';
-            } elseif ((time() - (int)$requestedAt) > 60) {
+            } elseif ($requestedAt !== null && (time() - (int)$requestedAt) > 60) {
                 $r['ping_state'] = 'timeout';
                 $r['effective_status'] = 'offline';
-            } else {
+            } elseif ($requestedAt !== null) {
                 $r['ping_state'] = 'pending';
             }
         }

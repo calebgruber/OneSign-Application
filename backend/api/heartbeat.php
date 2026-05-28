@@ -39,7 +39,8 @@ $requestedAt = runtimeStoreGet("ws_ping_request_$workstation");
 if ($requestedAt !== null) {
     $pingRequested = true;
     runtimeStoreSet("ws_ping_ack_$workstation", time(), 120);
-    runtimeStoreDelete("ws_ping_request_$workstation");
+    // Keep the request key so workstations.php can observe both request + ack
+    // and correctly display the ping state. The key expires after its 120 s TTL.
 }
 
 jsonResponse(['ok' => true, 'ping_requested' => $pingRequested]);

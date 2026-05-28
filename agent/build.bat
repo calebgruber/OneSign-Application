@@ -24,6 +24,7 @@ echo [OneSign] Building EXE...
   --name "OneSignAgent" ^
   --icon "..\backend\assets\img\logo.ico" ^
   --add-data "config.ini;." ^
+  --hidden-import=ctypes ^
   onesign_agent.py
 if errorlevel 1 exit /b 1
 
