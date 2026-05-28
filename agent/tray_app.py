@@ -8,7 +8,7 @@ Uses:
 
 The tray icon shows:
   - Green/grey status dot on the icon
-  - Right-click menu: Status, Enroll card, About, Exit
+  - Right-click menu: Status, Check for Updates, Enroll card, About, Exit
   - Balloon notification on card tap events
 """
 
@@ -175,6 +175,7 @@ class TrayApp:
             pystray.MenuItem(lambda _: self._status_text, None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Sync with Server", self._on_sync),
+            pystray.MenuItem("Check for Updates", self._on_check_updates),
             pystray.MenuItem("Show Connection Status", self._on_status),
             pystray.MenuItem("Open Agent Log", self._on_open_log),
             pystray.MenuItem("Open Admin Panel", self._on_open_admin),
@@ -219,6 +220,16 @@ class TrayApp:
     def _on_status(self, icon, item):
         if self._agent:
             self.notify("OneSign Status", self._agent.get_status_summary(), duration=6)
+
+    def _on_check_updates(self, icon, item):
+        if not self._agent:
+            self.notify("OneSign Updates", "Agent context is unavailable.", duration=5)
+            return
+        threading.Thread(
+            target=self._agent.check_for_updates,
+            kwargs={"manual": True, "install": True},
+            daemon=True,
+        ).start()
 
     def _on_open_log(self, icon, item):
         if not self._agent:

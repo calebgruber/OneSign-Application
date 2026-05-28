@@ -14,16 +14,20 @@ Configuration: config.ini (next to the EXE).
 """
 
 import configparser
+import json
 import logging
 import logging.handlers
 import os
 import platform
 import socket
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -117,11 +121,37 @@ DEFAULT_CONFIG = {
         "command": "",
         "timeout_seconds": "20",
     },
+    "updates": {
+        "enabled": "true",
+        "github_repo": "calebgruber/OneSign-Application",
+        "branch": "main",
+        "check_interval_minutes": "30",
+        "auto_install": "false",
+        "installer_url": "",
+        "installer_asset_name": "OneSignAgentSetup.exe",
+    },
 }
 
 HOSTNAME = socket.gethostname()
-APP_VERSION = "1.0.0"
 ENROLLMENT_POLL_INTERVAL_SECONDS = 2.0
+GITHUB_API_BASE = "https://api.github.com"
+
+
+def _load_version_info() -> dict[str, str]:
+    info_path = _BASE / "version_info.json"
+    if info_path.is_file():
+        try:
+            payload = json.loads(info_path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return {str(k): str(v) for k, v in payload.items()}
+        except Exception as exc:
+            logger.debug("Could not parse version_info.json: %s", exc)
+    return {}
+
+
+APP_INFO = _load_version_info()
+APP_VERSION = APP_INFO.get("version", "1.0.0")
+APP_COMMIT = APP_INFO.get("commit", "")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,6 +200,12 @@ class OneSignAgent:
             "Content-Type": "application/json",
         })
         self._session_timeout = 8
+        self._update_lock = threading.Lock()
+        self._update_check_pending = False
+        self._last_update_check_at = 0.0
+        self._last_notified_update_commit: str | None = None
+        self._current_commit = self._resolve_local_commit()
+        self._current_version = APP_VERSION
 
     def get_server_base_url(self) -> str:
         raw = self.config.get("server", "url", fallback="http://localhost").strip()
@@ -241,6 +277,192 @@ class OneSignAgent:
         self.tray.notify("OneSign — Sync Failed", msg, duration=6)
         return False, msg
 
+    def check_for_updates(self, manual: bool = False, install: bool = False) -> tuple[bool, str]:
+        if not self.config.getboolean("updates", "enabled", fallback=True):
+            msg = "Updates are disabled in config.ini."
+            if manual:
+                self.tray.notify("OneSign Updates", msg, duration=5)
+            return False, msg
+
+        if not self._update_lock.acquire(blocking=False):
+            msg = "Update check already in progress."
+            if manual:
+                self.tray.notify("OneSign Updates", msg, duration=4)
+            return False, msg
+
+        try:
+            repo = self.config.get("updates", "github_repo", fallback="calebgruber/OneSign-Application").strip()
+            branch = self.config.get("updates", "branch", fallback="main").strip()
+            latest_commit, err = self._fetch_latest_commit(repo, branch)
+            if err or not latest_commit:
+                msg = err or "Could not check for updates."
+                if manual:
+                    self.tray.notify("OneSign Update Check Failed", msg, duration=6)
+                return False, msg
+
+            current = self._current_commit
+            if current and latest_commit.lower() == current.lower():
+                msg = f"Already up to date ({latest_commit[:7]})."
+                if manual:
+                    self.tray.notify("OneSign Updates", msg, duration=4)
+                return True, msg
+
+            update_msg = (
+                f"Update available: {latest_commit[:7]}"
+                + (f" (current {current[:7]})" if current else "")
+            )
+            if not install:
+                if manual or self._last_notified_update_commit != latest_commit:
+                    self.tray.notify("OneSign Update Available", update_msg, duration=6)
+                    self._last_notified_update_commit = latest_commit
+                return True, update_msg
+
+            self.tray.notify("OneSign Updater", "Downloading update package…", duration=4)
+            installer_path, download_err = self._download_update_installer(repo)
+            if download_err or not installer_path:
+                msg = download_err or "Update download failed."
+                self.tray.notify("OneSign Update Failed", msg, duration=6)
+                return False, msg
+
+            ok, launch_msg = self._launch_update_installer(installer_path)
+            if not ok:
+                self.tray.notify("OneSign Update Failed", launch_msg, duration=7)
+                return False, launch_msg
+
+            self.tray.notify("OneSign Updating", "Installer started. The agent will restart automatically.", duration=6)
+            logger.info("Update launched from %s", installer_path)
+            self.stop()
+            os._exit(0)
+        finally:
+            self._update_lock.release()
+
+    def _resolve_local_commit(self) -> str:
+        if APP_COMMIT:
+            return APP_COMMIT
+        if getattr(sys, "frozen", False):
+            return ""
+        try:
+            raw = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(_BASE.parent),
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+            return raw
+        except Exception:
+            return ""
+
+    def _fetch_latest_commit(self, repo: str, branch: str) -> tuple[str | None, str | None]:
+        url = f"{GITHUB_API_BASE}/repos/{repo}/commits/{branch}"
+        try:
+            resp = requests.get(
+                url,
+                timeout=15,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": "OneSign-Agent-Updater",
+                },
+            )
+        except requests.RequestException as exc:
+            return None, f"Could not reach GitHub: {exc}"
+
+        if resp.status_code != 200:
+            return None, f"GitHub update check returned HTTP {resp.status_code}"
+        try:
+            payload = resp.json()
+        except Exception:
+            return None, "GitHub update response was not valid JSON"
+        sha = str(payload.get("sha", "")).strip()
+        if not sha:
+            return None, "GitHub update response did not include a commit SHA"
+        return sha, None
+
+    def _resolve_installer_url(self, repo: str) -> tuple[str, str]:
+        custom_url = self.config.get("updates", "installer_url", fallback="").strip()
+        if custom_url:
+            return custom_url, "custom"
+        asset_name = self.config.get("updates", "installer_asset_name", fallback="OneSignAgentSetup.exe").strip()
+        if not asset_name:
+            asset_name = "OneSignAgentSetup.exe"
+        return f"https://github.com/{repo}/releases/latest/download/{asset_name}", "release"
+
+    def _download_update_installer(self, repo: str) -> tuple[str | None, str | None]:
+        installer_url, _ = self._resolve_installer_url(repo)
+        parsed = urlparse(installer_url)
+        if parsed.scheme.lower() != "https":
+            return None, "Installer URL must use HTTPS"
+
+        update_dir = Path(tempfile.gettempdir()) / "OneSign" / "updates"
+        update_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = update_dir / "OneSignAgentSetup-latest.exe"
+
+        try:
+            with requests.get(
+                installer_url,
+                stream=True,
+                timeout=60,
+                headers={"User-Agent": "OneSign-Agent-Updater"},
+            ) as resp:
+                if resp.status_code != 200:
+                    return None, f"Installer download returned HTTP {resp.status_code}"
+                with open(dest_path, "wb") as fh:
+                    for chunk in resp.iter_content(chunk_size=1024 * 256):
+                        if chunk:
+                            fh.write(chunk)
+        except requests.RequestException as exc:
+            return None, f"Download failed: {exc}"
+        except Exception as exc:
+            return None, f"Could not write installer: {exc}"
+
+        try:
+            size = dest_path.stat().st_size
+        except Exception:
+            size = 0
+        if size < 1024:
+            return None, "Downloaded installer is invalid or empty"
+        return str(dest_path), None
+
+    def _launch_update_installer(self, installer_path: str) -> tuple[bool, str]:
+        if not os.path.isfile(installer_path):
+            return False, "Downloaded installer was not found"
+
+        script_path = Path(tempfile.gettempdir()) / "OneSign" / "updates" / "run_onesign_update.cmd"
+        script_path.parent.mkdir(parents=True, exist_ok=True)
+        install_cmd = f'"{installer_path}"'
+        if _is_elevated():
+            install_cmd = (
+                f'"{installer_path}" /VERYSILENT /SUPPRESSMSGBOXES '
+                f'/NORESTART /SP- /TASKS="installservice"'
+            )
+        script_content = "\r\n".join([
+            "@echo off",
+            "timeout /t 2 /nobreak >nul",
+            install_cmd,
+            "set RC=%ERRORLEVEL%",
+            "if \"%RC%\"==\"0\" (",
+            "  net stop OneSignAgent >nul 2>&1",
+            "  net start OneSignAgent >nul 2>&1",
+            ")",
+            f'del /q "{installer_path}" >nul 2>&1',
+            "del /q \"%~f0\" >nul 2>&1",
+            "",
+        ])
+        try:
+            script_path.write_text(script_content, encoding="utf-8")
+            creation_flags = 0
+            if hasattr(subprocess, "DETACHED_PROCESS"):
+                creation_flags |= subprocess.DETACHED_PROCESS
+            if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen(
+                ["cmd.exe", "/C", str(script_path)],
+                close_fds=True,
+                creationflags=creation_flags,
+            )
+            return True, "Installer launched"
+        except Exception as exc:
+            return False, f"Could not launch installer: {exc}"
+
     def _send_heartbeat_once(self) -> tuple[bool, str]:
         url = self.get_server_base_url() + "/api/heartbeat.php"
         payload = {
@@ -300,6 +522,10 @@ class OneSignAgent:
         # Reader polling thread
         t_rd = threading.Thread(target=self._reader_loop, daemon=True)
         t_rd.start()
+
+        # Auto-update thread
+        t_upd = threading.Thread(target=self._update_loop, daemon=True)
+        t_upd.start()
 
         # Tray (blocks until exit)
         self.tray.set_status("idle", "OneSign Agent — Ready")
@@ -561,6 +787,31 @@ class OneSignAgent:
             except Exception as exc:
                 logger.debug("Heartbeat failed: %s", exc)
             time.sleep(interval)
+
+    def _update_loop(self):
+        interval_minutes = max(
+            1,
+            self.config.getint("updates", "check_interval_minutes", fallback=30),
+        )
+        sleep_seconds = 5
+        while self._running:
+            now = time.monotonic()
+            should_check = (
+                self.config.getboolean("updates", "enabled", fallback=True)
+                and (
+                    self._last_update_check_at <= 0
+                    or (now - self._last_update_check_at) >= (interval_minutes * 60)
+                )
+            )
+            if should_check and not self._update_check_pending:
+                self._update_check_pending = True
+                try:
+                    auto_install = self.config.getboolean("updates", "auto_install", fallback=False)
+                    self.check_for_updates(manual=False, install=auto_install)
+                finally:
+                    self._last_update_check_at = time.monotonic()
+                    self._update_check_pending = False
+            time.sleep(sleep_seconds)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

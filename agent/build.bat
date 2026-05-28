@@ -17,6 +17,19 @@ echo [OneSign] Installing dependencies...
 %PYTHON_CMD% -m pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
+echo [OneSign] Writing version_info.json...
+for /f %%i in ('git rev-parse HEAD 2^>nul') do set "GIT_COMMIT=%%i"
+if not defined GIT_COMMIT set "GIT_COMMIT=unknown"
+for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToString(\"yyyy-MM-ddTHH:mm:ssK\")"') do set "BUILD_TIME=%%i"
+if not defined BUILD_TIME set "BUILD_TIME=unknown"
+(
+  echo {
+  echo   "version": "1.0.0",
+  echo   "commit": "%GIT_COMMIT%",
+  echo   "built_at": "%BUILD_TIME%"
+  echo }
+) > version_info.json
+
 echo [OneSign] Building EXE...
 %PYTHON_CMD% -m PyInstaller ^
   --onefile ^
@@ -24,6 +37,7 @@ echo [OneSign] Building EXE...
   --name "OneSignAgent" ^
   --icon "..\backend\assets\img\logo.ico" ^
   --add-data "config.ini;." ^
+  --add-data "version_info.json;." ^
   --hidden-import=ctypes ^
   onesign_agent.py
 if errorlevel 1 exit /b 1

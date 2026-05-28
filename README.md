@@ -161,8 +161,16 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[credential_provider] enabled` | `false` | Use external credential provider helper for unlocks |
 | `[credential_provider] command` | *(empty)* | Command to invoke helper (receives JSON creds on stdin) |
 | `[credential_provider] timeout_seconds` | `20` | Helper process timeout in seconds |
+| `[updates] enabled` | `true` | Enable in-app update checks |
+| `[updates] github_repo` | `calebgruber/OneSign-Application` | GitHub repository to monitor |
+| `[updates] branch` | `main` | Branch used for commit-based update checks |
+| `[updates] check_interval_minutes` | `30` | Automatic update check interval |
+| `[updates] auto_install` | `false` | Automatically download/install when a new commit is detected |
+| `[updates] installer_url` | *(empty)* | Optional direct installer URL override |
+| `[updates] installer_asset_name` | `OneSignAgentSetup.exe` | Latest release asset filename used when `installer_url` is empty |
 
 Tip: If the reader is not connecting, open the tray menu and use **Reader Control…** to enumerate attached readers, select a device index, reconnect, and run a test read.
+Tip: Use the tray menu **Check for Updates** action to download/install the latest agent package and restart after new commits are detected.
 
 ### `backend/config/config.php`
 
