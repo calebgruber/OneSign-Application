@@ -94,6 +94,32 @@
   letter-spacing: .04em;
 }
 
+/* ── Status badge palette ──────────────────────────────────────────── */
+.onesign-badge-green {
+  color: #2fb344 !important;
+  background-color: rgba(47, 179, 68, 0.25) !important;
+}
+
+.onesign-badge-red {
+  color: #d63939 !important;
+  background-color: rgba(214, 57, 57, 0.25) !important;
+}
+
+.onesign-badge-gray {
+  color: #667382 !important;
+  background-color: rgba(102, 115, 130, 0.25) !important;
+}
+
+.onesign-badge-blue {
+  color: #206bc4 !important;
+  background-color: rgba(32, 107, 196, 0.25) !important;
+}
+
+.onesign-badge-yellow {
+  color: #f59f00 !important;
+  background-color: rgba(245, 159, 0, 0.25) !important;
+}
+
 /* ── Toast container (top-right) ─────────────────────────────────── */
 #toast-container {
   position: fixed;

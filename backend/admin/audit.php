@@ -65,12 +65,12 @@ async function loadAudit() {
 
   tbody.innerHTML = data.map(ev => {
     const badgeCls = ev.event_type.includes('success') || ev.event_type.includes('enrolled')
-      ? 'bg-green-lt text-green'
+      ? 'onesign-badge-green'
       : ev.event_type.includes('not_found') || ev.event_type.includes('disabled')
-        ? 'bg-red-lt text-red'
+        ? 'onesign-badge-red'
         : ev.event_type === 'logout'
-          ? 'bg-secondary-lt text-secondary'
-          : 'bg-blue-lt text-blue';
+          ? 'onesign-badge-gray'
+          : 'onesign-badge-blue';
     return `
       <tr data-search="${escHtml(((ev.full_name||'')+(ev.card_id||'')+(ev.workstation||'')+ev.event_type).toLowerCase())}">
         <td class="text-muted small text-nowrap">${fmtDate(ev.created_at, true)}</td>
@@ -80,8 +80,8 @@ async function loadAudit() {
         <td>${escHtml(ev.workstation || '—')}</td>
         <td class="text-muted small">${escHtml(ev.ip_address || '')}</td>
         <td class="text-center">${ev.success
-          ? '<span class="badge bg-green">OK</span>'
-          : '<span class="badge bg-red">FAIL</span>'}</td>
+          ? '<span class="badge onesign-badge-green">OK</span>'
+          : '<span class="badge onesign-badge-red">FAIL</span>'}</td>
         <td class="text-muted small">${escHtml(ev.details || '')}</td>
       </tr>`;
   }).join('');

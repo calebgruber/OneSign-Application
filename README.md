@@ -25,7 +25,7 @@ An open-source Imprivata OneSign replica for Windows, using an **RF Ideas pcProx
 ## Prerequisites
 
 ### Server
-- PHP 8.1+ with extensions: `pdo_mysql`, `openssl`, `apcu`
+- PHP 8.1+ with extensions: `pdo_mysql`, `openssl`
 - MySQL 8.0+ (or MariaDB 10.6+)
 - Apache 2.4+ (with `mod_rewrite`) or Nginx with PHP-FPM
 - HTTPS strongly recommended for production
@@ -72,13 +72,7 @@ mysql -u onesign -p onesign < backend/setup.sql
        AllowOverride All
    </Directory>
    ```
-4. Ensure APCu is enabled in `php.ini`:
-   ```ini
-   extension=apcu
-   apc.enabled=1
-   apc.shm_size=32M
-   ```
-5. Browse to `http://YOUR_SERVER/onesign/` → redirects to admin login.
+4. Browse to `http://YOUR_SERVER/onesign/` → redirects to admin login.
    - Default credentials: **admin / password** — **change immediately!**
 
 ### 3. Admin Panel First Steps
@@ -157,7 +151,7 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 |-----|---------|-------------|
 | `[server] url` | `http://YOUR_SERVER` | Backend URL (no trailing slash) |
 | `[server] api_key` | `CHANGE_ME` | API key from admin panel |
-| `[reader] dll_path` | `C:\...\pcProxAPI64.dll` | Path to pcProx DLL |
+| `[reader] dll_path` | `C:\Program Files\OneSign Agent\pcProxAPI64.dll` | Path to pcProx DLL |
 | `[reader] poll_interval_ms` | `250` | Card polling interval |
 | `[reader] active_device_index` | `-1` | Reader index to use when multiple readers are connected |
 | `[behavior] lock_on_remove` | `true` | Lock on badge removal |

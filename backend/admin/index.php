@@ -35,7 +35,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="text-muted mt-1">OneSign deployment overview</div>
       </div>
       <div class="col-auto ms-auto">
-        <span class="badge bg-green-lt"><span class="onesign-dot me-1"></span>Live</span>
+        <span class="badge onesign-badge-green"><span class="onesign-dot me-1"></span>Live</span>
       </div>
     </div>
   </div>
@@ -100,9 +100,9 @@ include __DIR__ . '/../includes/header.php';
               <?php endif; ?>
               <?php foreach ($workstations as $ws):
                 $badgeCls = match($ws['status']) {
-                  'online' => 'bg-green',
-                  'locked' => 'bg-yellow text-yellow-fg',
-                  default  => 'bg-secondary',
+                  'online' => 'onesign-badge-green',
+                  'locked' => 'onesign-badge-yellow',
+                  default  => 'onesign-badge-gray',
                 };
               ?>
                 <tr>

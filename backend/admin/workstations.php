@@ -118,8 +118,8 @@ async function loadApiKeys() {
       <td>${escHtml(k.workstation || 'Any')}</td>
       <td class="text-muted">${k.last_used ? fmtDate(k.last_used, true) : '<span class="text-muted">Never</span>'}</td>
       <td class="text-center">${k.active
-        ? '<span class="badge bg-green-lt text-green">Active</span>'
-        : '<span class="badge bg-red-lt text-red">Revoked</span>'}</td>
+        ? '<span class="badge onesign-badge-green">Active</span>'
+        : '<span class="badge onesign-badge-red">Revoked</span>'}</td>
       <td class="text-end">
         <button class="btn btn-sm btn-ghost-danger" onclick="deleteKey(${k.id})" title="Revoke">
           <i class="ti ti-trash"></i>
@@ -138,13 +138,13 @@ async function loadWorkstations() {
   if (!Array.isArray(data) || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
   tbody.innerHTML = data.map(w => {
     const effectiveStatus = w.effective_status || w.status || 'offline';
-    const cls = effectiveStatus === 'online' ? 'bg-green' : effectiveStatus === 'locked' ? 'bg-yellow text-yellow-fg' : 'bg-secondary';
+    const cls = effectiveStatus === 'online' ? 'onesign-badge-green' : effectiveStatus === 'locked' ? 'onesign-badge-yellow' : 'onesign-badge-gray';
     const pingBadge = w.ping_state === 'pending'
-      ? '<span class="badge bg-blue-lt text-blue ms-1">pinging</span>'
+      ? '<span class="badge onesign-badge-blue ms-1">pinging</span>'
       : w.ping_state === 'ack'
-        ? '<span class="badge bg-green-lt text-green ms-1">ping ok</span>'
+        ? '<span class="badge onesign-badge-green ms-1">ping ok</span>'
         : w.ping_state === 'timeout'
-          ? '<span class="badge bg-red-lt text-red ms-1">no ping</span>'
+          ? '<span class="badge onesign-badge-red ms-1">no ping</span>'
           : '';
     return `
       <tr>
@@ -188,7 +188,7 @@ async function refreshWorkstationsWithPing(showErrors = false) {
     await loadWorkstations();
     startPingFollowupPolling();
     if (showErrors && pingResponse && pingResponse.ping_supported === false) {
-      alert(pingResponse.message || 'APCu is not available, so real-time ping checks are disabled.');
+      alert(pingResponse.message || 'Live ping checks are currently unavailable.');
     }
   } catch (err) {
     try {

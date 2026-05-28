@@ -113,8 +113,8 @@ async function loadCards() {
       <td class="text-muted">${fmtDate(c.enrolled_at)}</td>
       <td class="text-muted">${c.last_used ? fmtDate(c.last_used) : '<span class="text-muted">Never</span>'}</td>
       <td class="text-center">${c.active
-        ? '<span class="badge bg-green-lt text-green">Active</span>'
-        : '<span class="badge bg-red-lt text-red">Revoked</span>'}</td>
+        ? '<span class="badge onesign-badge-green">Active</span>'
+        : '<span class="badge onesign-badge-red">Revoked</span>'}</td>
       <td class="text-end">
         <button class="btn btn-sm btn-ghost-${c.active?'warning':'success'}" onclick="toggleCard(${c.id},${c.active})" title="${c.active?'Revoke':'Activate'}">
           <i class="ti ti-${c.active?'slash':'check'}"></i>

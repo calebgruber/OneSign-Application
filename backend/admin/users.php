@@ -143,10 +143,10 @@ function renderUsers(data) {
       </div></td>
       <td class="text-muted"><code>${escHtml(u.username)}</code></td>
       <td>${escHtml(u.department || '—')}</td>
-      <td class="text-center"><span class="badge bg-blue-lt text-blue">${u.card_count}</span></td>
+      <td class="text-center"><span class="badge onesign-badge-blue">${u.card_count}</span></td>
       <td class="text-center">${u.active
-        ? '<span class="badge bg-green-lt text-green">Active</span>'
-        : '<span class="badge bg-red-lt text-red">Disabled</span>'}</td>
+        ? '<span class="badge onesign-badge-green">Active</span>'
+        : '<span class="badge onesign-badge-red">Disabled</span>'}</td>
       <td class="text-muted">${fmtDate(u.created_at)}</td>
       <td class="text-end">
         <button class="btn btn-sm btn-ghost-primary" onclick="editUser(${u.id})" title="Edit"><i class="ti ti-pencil"></i></button>

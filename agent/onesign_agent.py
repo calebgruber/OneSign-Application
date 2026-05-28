@@ -102,7 +102,7 @@ DEFAULT_CONFIG = {
         "api_key": "CHANGE_ME",
     },
     "reader": {
-        "dll_path": r"C:\Program Files\RF IDeas\pcProx\pcProxAPI64.dll",
+        "dll_path": r"C:\Program Files\OneSign Agent\pcProxAPI64.dll",
         "poll_interval_ms": "250",
         "active_device_index": "-1",
     },

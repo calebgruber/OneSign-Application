@@ -105,6 +105,16 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Runtime key/value store with TTL (used for enrollment queue + ping handshakes)
+CREATE TABLE IF NOT EXISTS runtime_store (
+    store_key VARCHAR(191) NOT NULL PRIMARY KEY,
+    store_value TEXT NOT NULL,
+    expires_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_expires_at (expires_at)
+);
+
 -- API keys for agent authentication
 CREATE TABLE IF NOT EXISTS api_keys (
     id INT AUTO_INCREMENT PRIMARY KEY,

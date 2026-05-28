@@ -5,6 +5,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/runtime_store.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { jsonResponse(['error' => 'Method not allowed'], 405); }
 if (!authenticateApiKey()) { jsonResponse(['error' => 'Unauthorized'], 401); }
@@ -34,15 +35,11 @@ if ($wsRow) {
 }
 
 $pingRequested = false;
-if (function_exists('apcu_fetch') && function_exists('apcu_store')) {
-    $requestedAt = apcu_fetch("ws_ping_request_$workstation");
-    if ($requestedAt !== false) {
-        $pingRequested = true;
-        apcu_store("ws_ping_ack_$workstation", time(), 120);
-        if (function_exists('apcu_delete')) {
-            apcu_delete("ws_ping_request_$workstation");
-        }
-    }
+$requestedAt = runtimeStoreGet("ws_ping_request_$workstation");
+if ($requestedAt !== null) {
+    $pingRequested = true;
+    runtimeStoreSet("ws_ping_ack_$workstation", time(), 120);
+    runtimeStoreDelete("ws_ping_request_$workstation");
 }
 
 jsonResponse(['ok' => true, 'ping_requested' => $pingRequested]);

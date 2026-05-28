@@ -5,11 +5,11 @@
  */
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/runtime_store.php';
 requireAdminLogin();
 
 $pdo = db();
 $method = $_SERVER['REQUEST_METHOD'];
-$apcuAvailable = function_exists('apcu_fetch') && function_exists('apcu_store');
 
 try {
     if ($method === 'POST') {
@@ -17,16 +17,6 @@ try {
         $action = trim($body['action'] ?? '');
         if ($action !== 'ping_all') {
             jsonResponse(['error' => 'Unsupported action'], 400);
-        }
-
-        if (!$apcuAvailable) {
-            jsonResponse([
-                'ok' => true,
-                'requested' => 0,
-                'requested_at' => null,
-                'ping_supported' => false,
-                'message' => 'Live ping checks are disabled because APCu is not installed',
-            ]);
         }
 
         $rows = $pdo->query('SELECT hostname FROM workstations')->fetchAll();
@@ -37,10 +27,8 @@ try {
             if ($hostname === '') {
                 continue;
             }
-            apcu_store("ws_ping_request_$hostname", $requestedAt, 120);
-            if (function_exists('apcu_delete')) {
-                apcu_delete("ws_ping_ack_$hostname");
-            }
+            runtimeStoreSet("ws_ping_request_$hostname", $requestedAt, 120);
+            runtimeStoreDelete("ws_ping_ack_$hostname");
             $count++;
         }
 
@@ -93,27 +81,25 @@ try {
         $r['ping_state'] = 'idle';
         $r['ping_requested_at'] = null;
         $r['ping_acked_at'] = null;
-        $r['ping_supported'] = $apcuAvailable;
+        $r['ping_supported'] = true;
 
-        if ($apcuAvailable) {
-            $hostname = (string)$r['hostname'];
-            $requestedAt = apcu_fetch("ws_ping_request_$hostname");
-            $ackedAt = apcu_fetch("ws_ping_ack_$hostname");
+        $hostname = (string)$r['hostname'];
+        $requestedAt = runtimeStoreGet("ws_ping_request_$hostname");
+        $ackedAt = runtimeStoreGet("ws_ping_ack_$hostname");
 
-            if ($requestedAt !== false) {
-                $r['ping_requested_at'] = (int)$requestedAt;
-                if ($ackedAt !== false) {
-                    $r['ping_acked_at'] = (int)$ackedAt;
-                }
+        if ($requestedAt !== null) {
+            $r['ping_requested_at'] = (int)$requestedAt;
+            if ($ackedAt !== null) {
+                $r['ping_acked_at'] = (int)$ackedAt;
+            }
 
-                if ($ackedAt !== false && (int)$ackedAt >= (int)$requestedAt) {
-                    $r['ping_state'] = 'ack';
-                } elseif ((time() - (int)$requestedAt) > 60) {
-                    $r['ping_state'] = 'timeout';
-                    $r['effective_status'] = 'offline';
-                } else {
-                    $r['ping_state'] = 'pending';
-                }
+            if ($ackedAt !== null && (int)$ackedAt >= (int)$requestedAt) {
+                $r['ping_state'] = 'ack';
+            } elseif ((time() - (int)$requestedAt) > 60) {
+                $r['ping_state'] = 'timeout';
+                $r['effective_status'] = 'offline';
+            } else {
+                $r['ping_state'] = 'pending';
             }
         }
     }
