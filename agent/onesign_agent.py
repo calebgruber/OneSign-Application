@@ -217,7 +217,7 @@ class OneSignAgent:
             on_lock_requested=self._lock_from_session_shell,
             on_password_login=self._handle_password_login,
         )
-        self.session_shell.set_theme(self._ui_settings)
+        self.session_shell.set_theme(self._get_session_shell_theme())
 
     def get_server_base_url(self) -> str:
         raw = self.config.get("server", "url", fallback="http://localhost").strip()
@@ -281,7 +281,22 @@ class OneSignAgent:
                 normalized[str(key)] = str(val)
             if normalized:
                 self._ui_settings.update(normalized)
-                self.session_shell.set_theme(self._ui_settings)
+                self.session_shell.set_theme(self._get_session_shell_theme())
+
+    def _get_session_shell_theme(self) -> dict[str, str]:
+        theme = dict(self._ui_settings)
+        theme["lock_server_base_url"] = self.get_server_base_url()
+        return theme
+
+    def _notify_login_success(self, full_name: str):
+        display_name = (full_name or "User").strip() or "User"
+        self.tray.notify("OneSign — Welcome", f"Welcome, {display_name}", duration=4)
+
+        def _follow_up():
+            time.sleep(4.2)
+            self.tray.notify("OneSign", "You've got Single Sign On.", duration=5)
+
+        threading.Thread(target=_follow_up, daemon=True, name="OneSign-SuccessToast").start()
 
     def get_status_summary(self) -> str:
         reader_state = "Connected" if self._reader_connected else "Disconnected"
@@ -871,11 +886,7 @@ class OneSignAgent:
                 return False
 
             logger.info("Auth success: %s", username)
-            self.tray.notify(
-                "OneSign — Welcome",
-                f"Logging in as {fullname}…",
-                duration=4,
-            )
+            self._notify_login_success(fullname)
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
             ok = True
@@ -887,7 +898,7 @@ class OneSignAgent:
                 self.session_shell.notify_auth_failed("Authentication failed.")
                 self.tray.set_status("connected")
                 return False
-            self.session_shell.hide()
+            self.session_shell.notify_auth_success(fullname)
             return True
         elif resp.status_code == 401:
             logger.warning("Authentication failed due to API key issue")
@@ -958,9 +969,9 @@ class OneSignAgent:
             return
 
         self._active_session_card = None
-        self.tray.notify("OneSign — Welcome", f"Logging in as {full_name}…", duration=4)
+        self._notify_login_success(full_name)
         self.tray.set_status("connected", f"OneSign — {full_name}")
-        self.session_shell.hide()
+        self.session_shell.notify_auth_success(full_name)
 
     # ── Enrollment mode ───────────────────────────────────────────────────────
 

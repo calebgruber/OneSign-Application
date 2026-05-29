@@ -159,8 +159,8 @@ Right-click the OneSign tray icon → **Enroll Card…** → tap the badge.
 | `[behavior] lock_delay_seconds` | `5` | Legacy delay option used with remove-based lock behavior |
 | `[behavior] heartbeat_interval` | `30` | Heartbeat period (seconds) |
 | `[ui] fullscreen_shell_enabled` | `true` | Enables the agent-managed fullscreen lock overlay |
-| `[ui] lock_background_image` | *(empty)* | Optional lock overlay background image URL |
-| `[ui] lock_logo_image` | *(empty)* | Optional lock overlay logo image URL |
+| `[ui] lock_background_image` | *(empty)* | Optional lock overlay background image URL or local file path |
+| `[ui] lock_logo_image` | *(empty)* | Optional lock overlay logo image URL or local file path |
 | `[ui] lock_brand_name` | `Secure log in` | Brand text shown on the lock overlay |
 | `[ui] lock_color_primary` | `#2B4D89` | Primary lock overlay color |
 | `[ui] lock_color_panel` | `#1D2A43` | Right-side panel color |
