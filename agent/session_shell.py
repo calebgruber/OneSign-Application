@@ -1,7 +1,12 @@
 import io
+import json
 import logging
+import mimetypes
 import queue
 import threading
+import time
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
 from urllib.parse import urljoin, urlparse
@@ -20,6 +25,11 @@ except Exception:  # pragma: no cover - depends on host runtime
     ImageOps = None
     ImageTk = None
 
+try:
+    import webview
+except Exception:  # pragma: no cover - depends on host runtime
+    webview = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +44,7 @@ class SessionShell:
         self._thread: threading.Thread | None = None
         self._running = False
         self._ready = threading.Event()
-        self._available = tk is not None
+        self._available = (webview is not None) or (tk is not None)
         self._theme = {
             "lock_background_image": "",
             "lock_logo_image": "",
@@ -45,6 +55,22 @@ class SessionShell:
             "lock_color_hex": "#F4F6FA",
             "lock_color_text": "#FFFFFF",
         }
+        self._status_lock = threading.Lock()
+        self._status = {
+            "state": "hidden",
+            "helper": "Tap your badge or sign in with Windows credentials.",
+            "message": "Ready to unlock.",
+            "panel_message": "Welcome back.\nSingle Sign On is ready when you are.",
+            "workstation": "Unknown",
+            "display_name": "",
+        }
+        self._http_server: ThreadingHTTPServer | None = None
+        self._http_thread: threading.Thread | None = None
+        self._http_port = 0
+        self._webview_window = None
+        self._webview_stop = threading.Event()
+        self._theme_assets: dict[str, Path] = {}
+        self._lockscreen_path = Path(__file__).resolve().with_name("lockscreen.html")
 
     @property
     def available(self) -> bool:
@@ -85,11 +111,321 @@ class SessionShell:
         if self._running:
             return
         self._running = True
+        self._ready.clear()
         self._thread = threading.Thread(target=self._run_ui, daemon=True, name="OneSign-SessionShell")
         self._thread.start()
         self._ready.wait(timeout=5)
 
+    def _set_status(self, **updates):
+        with self._status_lock:
+            self._status.update({k: v for k, v in updates.items() if v is not None})
+
+    def _get_status(self) -> dict:
+        with self._status_lock:
+            return dict(self._status)
+
+    def _lockscreen_asset_path(self) -> Path:
+        if self._lockscreen_path.is_file():
+            return self._lockscreen_path
+        fallback = Path(__file__).resolve().with_name("imprivata-login (1).html")
+        return fallback
+
+    def _resolve_local_image(self, source: str) -> Path | None:
+        raw = (source or "").strip()
+        if not raw:
+            return None
+        if len(raw) > 1 and raw[1] == ":":
+            candidate = Path(raw)
+            return candidate if candidate.is_file() else None
+        if raw.startswith("\\\\"):
+            candidate = Path(raw)
+            return candidate if candidate.is_file() else None
+        parsed = urlparse(raw)
+        if parsed.scheme in {"http", "https"}:
+            return None
+        if parsed.scheme == "file":
+            candidate = Path(parsed.path)
+            return candidate if candidate.is_file() else None
+        source_path = Path(raw)
+        if source_path.is_absolute():
+            return source_path if source_path.is_file() else None
+        base_dir = Path(__file__).resolve().parent
+        for candidate in (Path.cwd() / source_path, base_dir / source_path, base_dir.parent / source_path):
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _resolve_remote_image(self, source: str) -> str | None:
+        raw = (source or "").strip()
+        if not raw:
+            return None
+        parsed = urlparse(raw)
+        if parsed.scheme in {"http", "https"}:
+            return raw
+        base_url = str(self._theme.get("lock_server_base_url", "")).strip()
+        if base_url:
+            return urljoin(base_url.rstrip("/") + "/", raw.lstrip("/"))
+        return None
+
+    def _build_theme_payload(self) -> dict:
+        payload = dict(self._theme)
+        assets: dict[str, Path] = {}
+        for key in ("lock_background_image", "lock_logo_image"):
+            source = str(payload.get(key, "") or "")
+            local_path = self._resolve_local_image(source)
+            if local_path is not None:
+                assets[key] = local_path
+                payload[key] = f"/theme-asset/{key}?v={int(local_path.stat().st_mtime_ns)}"
+                continue
+            payload[key] = self._resolve_remote_image(source) or ""
+        self._theme_assets = assets
+        return payload
+
+    def _start_http_server(self):
+        shell = self
+
+        class _Handler(BaseHTTPRequestHandler):
+            def log_message(self, fmt, *args):  # pragma: no cover - noisy
+                logger.debug("Lock shell http: " + fmt, *args)
+
+            def _respond_json(self, payload: dict, status: int = 200):
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _read_body(self) -> bytes:
+                length = int(self.headers.get("Content-Length", "0") or 0)
+                return self.rfile.read(length) if length > 0 else b""
+
+            def _serve_asset_file(self, file_path: Path):
+                if not file_path.is_file():
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                data = file_path.read_bytes()
+                content_type, _ = mimetypes.guess_type(str(file_path))
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", content_type or "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_GET(self):  # noqa: N802
+                parsed = urlparse(self.path)
+                path = parsed.path
+                if path in {"/", "/lockscreen.html"}:
+                    file_path = shell._lockscreen_asset_path()
+                    if not file_path.is_file():
+                        self.send_error(HTTPStatus.NOT_FOUND)
+                        return
+                    data = file_path.read_bytes()
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                if path == "/theme":
+                    self._respond_json(shell._build_theme_payload())
+                    return
+                if path == "/status":
+                    self._respond_json(shell._get_status())
+                    return
+                if path.startswith("/theme-asset/"):
+                    key = path.rsplit("/", 1)[-1]
+                    asset = shell._theme_assets.get(key)
+                    if asset is None:
+                        self.send_error(HTTPStatus.NOT_FOUND)
+                        return
+                    self._serve_asset_file(asset)
+                    return
+                self.send_error(HTTPStatus.NOT_FOUND)
+
+            def do_POST(self):  # noqa: N802
+                parsed = urlparse(self.path)
+                body = self._read_body()
+                payload = {}
+                if body:
+                    try:
+                        payload = json.loads(body.decode("utf-8"))
+                    except Exception:
+                        payload = {}
+                if parsed.path == "/login":
+                    username = str(payload.get("username", "")).strip()
+                    password = str(payload.get("password", ""))
+                    if not username or not password:
+                        self._respond_json({"success": False, "message": "Username and password are required."}, status=400)
+                        return
+                    shell._queue.put(("web_login", (username, password)))
+                    self._respond_json({"success": True})
+                    return
+                if parsed.path == "/lock":
+                    shell._queue.put(("lock_requested", ()))
+                    self._respond_json({"success": True})
+                    return
+                self.send_error(HTTPStatus.NOT_FOUND)
+
+        self._http_server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        self._http_port = int(self._http_server.server_address[1])
+        self._http_thread = threading.Thread(target=self._http_server.serve_forever, daemon=True, name="OneSign-LockHttp")
+        self._http_thread.start()
+
+    def _stop_http_server(self):
+        server = self._http_server
+        self._http_server = None
+        self._http_port = 0
+        if server is None:
+            return
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        try:
+            server.server_close()
+        except Exception:
+            pass
+
+    def _push_js(self, script: str):
+        window = self._webview_window
+        if window is None:
+            return
+        try:
+            window.evaluate_js(script)
+        except Exception:
+            pass
+
+    def _sync_web_theme(self):
+        payload = self._build_theme_payload()
+        self._push_js(f"window.oneSignShell?.updateTheme({json.dumps(payload)});")
+
+    def _sync_web_status(self):
+        status = self._get_status()
+        self._push_js(f"window.oneSignShell?.applyStatus({json.dumps(status)});")
+
+    def _webview_queue_pump(self):
+        while not self._webview_stop.is_set():
+            try:
+                command, args = self._queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            if command == "show_lock":
+                workstation = str(args[0] or "Unknown")
+                self._set_status(
+                    state="ready",
+                    helper="Tap your badge or sign in with Windows credentials.",
+                    message="Ready to unlock.",
+                    panel_message="Welcome back.\nSingle Sign On is ready when you are.",
+                    workstation=workstation,
+                    display_name="",
+                )
+                self._sync_web_theme()
+                self._sync_web_status()
+                window = self._webview_window
+                if window is not None:
+                    try:
+                        window.show()
+                        window.set_fullscreen(True)
+                    except Exception:
+                        pass
+            elif command == "hide":
+                self._set_status(state="hidden")
+                self._sync_web_status()
+                window = self._webview_window
+                if window is not None:
+                    try:
+                        window.hide()
+                    except Exception:
+                        pass
+            elif command == "theme":
+                payload = args[0] or {}
+                self._theme.update(payload)
+                self._sync_web_theme()
+            elif command == "auth_failed":
+                message = str(args[0] or "Authentication failed.")
+                self._set_status(
+                    state="failed",
+                    helper="Tap your badge or sign in with Windows credentials.",
+                    message=message,
+                    panel_message="Welcome back.\nSingle Sign On is ready when you are.",
+                )
+                self._sync_web_status()
+            elif command == "auth_success":
+                display_name = str(args[0] or "User")
+                self._set_status(
+                    state="success",
+                    helper="Authentication complete.",
+                    message=f"Welcome, {display_name}",
+                    panel_message="Loading your secure workspace…",
+                    display_name=display_name,
+                )
+                self._sync_web_status()
+                threading.Timer(1.8, lambda: self._queue.put(("hide", ()))).start()
+            elif command == "web_login":
+                username, password = args
+                self._set_status(
+                    state="authenticating",
+                    helper="Verifying your credentials with OneSign.",
+                    message="Authenticating…",
+                )
+                self._sync_web_status()
+                if callable(self._on_password_login):
+                    threading.Thread(target=self._on_password_login, args=(username, password), daemon=True).start()
+            elif command == "lock_requested":
+                if callable(self._on_lock_requested):
+                    threading.Thread(target=self._on_lock_requested, daemon=True).start()
+            elif command == "stop":
+                self._webview_stop.set()
+                window = self._webview_window
+                if window is not None:
+                    try:
+                        window.destroy()
+                    except Exception:
+                        pass
+
+    def _run_webview_ui(self):
+        if webview is None:
+            raise RuntimeError("pywebview is not installed")
+        if not self._lockscreen_asset_path().is_file():
+            raise RuntimeError("lockscreen HTML file is missing")
+
+        self._webview_stop.clear()
+        self._start_http_server()
+        self._set_status(state="hidden")
+        self._webview_window = webview.create_window(
+            "OneSign Lock",
+            url=f"http://127.0.0.1:{self._http_port}/lockscreen.html",
+            fullscreen=True,
+            frameless=True,
+            on_top=True,
+        )
+        pump_thread = threading.Thread(target=self._webview_queue_pump, daemon=True, name="OneSign-WebQueue")
+        pump_thread.start()
+        self._ready.set()
+        try:
+            webview.start(gui="edgechromium")
+        finally:
+            self._webview_stop.set()
+            self._webview_window = None
+            self._stop_http_server()
+
     def _run_ui(self):
+        if webview is not None:
+            try:
+                self._run_webview_ui()
+                return
+            except Exception as exc:
+                logger.warning("HTML lock shell unavailable, falling back to tkinter: %s", exc)
+                if tk is None:
+                    self._available = False
+                    self._running = False
+                    self._ready.set()
+                    return
+
         root = None
         try:
             root = tk.Tk()

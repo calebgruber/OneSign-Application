@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OneSign Lock</title>
+  <style>
+    :root {
+      --primary: #2B4D89;
+      --panel: #1D2A43;
+      --hex: #F4F6FA;
+      --text: #FFFFFF;
+      --alert: #E53935;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; font-family: "Segoe UI", sans-serif; }
+    body { overflow: hidden; color: var(--text); background: #000; }
+    .shell { position: fixed; inset: 0; }
+    .bg {
+      position: absolute; inset: 0;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-color: var(--primary);
+      filter: brightness(0.72);
+    }
+    .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
+
+    .layout { position: relative; z-index: 2; display: grid; grid-template-columns: 70% 30%; height: 100%; }
+    .left { position: relative; padding: 8vh 6vw 5vh; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+    .headline { font-size: clamp(30px, 4.6vh, 52px); font-weight: 700; margin: 0; }
+    .helper { margin: 0; opacity: 0.9; font-size: clamp(13px, 1.55vh, 21px); }
+
+    .hex-wrap {
+      margin-top: 8px;
+      width: min(46vw, 820px);
+      max-width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: clamp(16px, 2.2vw, 34px);
+      align-items: center;
+    }
+    .hex {
+      aspect-ratio: 1 / 1.14;
+      background: var(--hex);
+      clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
+      color: #20304F;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20% 10%;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 160px;
+    }
+    .hex .icon { font-size: clamp(20px, 2.8vw, 36px); }
+    .hex .title { font-weight: 700; font-size: clamp(12px, 1.6vw, 22px); }
+    .hex .sub { font-size: clamp(10px, 1.1vw, 14px); opacity: 0.8; }
+
+    .login {
+      margin-top: 16px;
+      width: min(540px, 92%);
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+    input {
+      height: 46px;
+      border: 0;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 0 14px;
+      outline: none;
+      font-size: 15px;
+    }
+    input::placeholder { color: rgba(255,255,255,0.7); }
+    .pass-wrap, .unlock-wrap { display: none; }
+    .typing .pass-wrap, .typing .unlock-wrap { display: block; }
+    button {
+      height: 46px;
+      border: 0;
+      padding: 0 20px;
+      background: var(--panel);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .alert {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-left: 4px solid var(--alert);
+      border-radius: 0;
+      background: rgba(229,57,53,0.25);
+      color: var(--alert);
+      font-size: 14px;
+      display: none;
+      width: min(540px, 92%);
+    }
+
+    .menu-btn {
+      position: absolute;
+      left: 6vw;
+      bottom: 4vh;
+      border: 1px solid rgba(255,255,255,0.55);
+      background: transparent;
+      color: #fff;
+      padding: 9px 14px;
+      font-weight: 700;
+    }
+
+    .right {
+      position: relative;
+      background: var(--panel);
+      padding: 8vh 2.8vw 4vh;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+    .logo { max-width: min(170px, 80%); max-height: 72px; object-fit: contain; align-self: end; }
+    .panel-title { margin-top: 2vh; font-size: clamp(23px, 3.5vh, 42px); font-weight: 700; }
+    .panel-msg { margin: 0; line-height: 1.45; opacity: 0.95; max-width: 28ch; font-size: clamp(13px, 1.7vh, 20px); }
+    .workstation { margin-top: auto; opacity: 0.75; font-size: clamp(12px, 1.4vh, 15px); text-align: right; }
+
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .right { display: none; }
+      .hex-wrap { width: min(76vw, 700px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" id="shell">
+    <div class="bg" id="bg"></div>
+    <div class="overlay"></div>
+    <div class="layout">
+      <section class="left">
+        <h1 class="headline" id="headline">Secure log in</h1>
+        <p class="helper" id="helper">Tap your badge or sign in with Windows credentials.</p>
+
+        <div class="hex-wrap">
+          <article class="hex"><div class="icon">🪪</div><div class="title">Tap Badge</div><div class="sub">Fast access</div></article>
+          <article class="hex"><div class="icon">🔐</div><div class="title">Unlock</div><div class="sub">Secure session</div></article>
+          <article class="hex"><div class="icon">💻</div><div class="title">SSO Ready</div><div class="sub">Windows sign-in</div></article>
+        </div>
+
+        <form class="login" id="loginForm" autocomplete="off">
+          <input id="username" placeholder="Username" />
+          <div class="pass-wrap"><input id="password" type="password" placeholder="Password" /></div>
+          <div class="unlock-wrap"><button type="submit" id="unlockBtn">Unlock</button></div>
+        </form>
+
+        <div class="alert" id="alertBox"></div>
+      </section>
+
+      <aside class="right" id="rightPanel">
+        <img class="logo" id="logo" alt="logo" style="display:none" />
+        <div class="panel-title" id="panelTitle">OneSign</div>
+        <p class="panel-msg" id="panelMessage">Welcome back. Single Sign On is ready when you are.</p>
+        <div class="workstation" id="workstation">Computer: Unknown</div>
+      </aside>
+    </div>
+    <button class="menu-btn" id="menuBtn" type="button">☰ Menu</button>
+  </div>
+
+  <script>
+    const state = { lastStatusHash: '', pollTimer: null, submitting: false, theme: {} };
+
+    const el = {
+      shell: document.getElementById('shell'),
+      bg: document.getElementById('bg'),
+      logo: document.getElementById('logo'),
+      headline: document.getElementById('headline'),
+      helper: document.getElementById('helper'),
+      panelTitle: document.getElementById('panelTitle'),
+      panelMessage: document.getElementById('panelMessage'),
+      workstation: document.getElementById('workstation'),
+      alertBox: document.getElementById('alertBox'),
+      loginForm: document.getElementById('loginForm'),
+      username: document.getElementById('username'),
+      password: document.getElementById('password'),
+      unlockBtn: document.getElementById('unlockBtn'),
+      menuBtn: document.getElementById('menuBtn')
+    };
+
+    function hexToRgba(hex, alpha) {
+      const clean = String(hex || '').replace('#', '').trim();
+      if (!/^[0-9a-fA-F]{6}$/.test(clean)) return `rgba(229,57,53,${alpha})`;
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function showAlert(message, color) {
+      if (!message) {
+        el.alertBox.style.display = 'none';
+        el.alertBox.textContent = '';
+        return;
+      }
+      const tone = color || state.theme.lock_color_alert || '#E53935';
+      const normalized = tone.startsWith('#') ? tone : `#${tone}`;
+      el.alertBox.textContent = message;
+      el.alertBox.style.color = normalized;
+      el.alertBox.style.borderLeftColor = normalized;
+      el.alertBox.style.backgroundColor = hexToRgba(normalized.replace('#', ''), 0.25);
+      el.alertBox.style.display = 'block';
+    }
+
+    function setTypingMode() {
+      const typing = el.username.value.trim().length > 0 || el.password.value.length > 0;
+      el.loginForm.classList.toggle('typing', typing);
+    }
+
+    function applyTheme(theme = {}) {
+      state.theme = { ...state.theme, ...theme };
+      const t = state.theme;
+      document.documentElement.style.setProperty('--primary', t.lock_color_primary || '#2B4D89');
+      document.documentElement.style.setProperty('--panel', t.lock_color_panel || '#1D2A43');
+      document.documentElement.style.setProperty('--hex', t.lock_color_hex || '#F4F6FA');
+      document.documentElement.style.setProperty('--text', t.lock_color_text || '#FFFFFF');
+      el.headline.textContent = t.lock_brand_name || 'Secure log in';
+      el.panelTitle.textContent = t.lock_right_title || 'OneSign';
+      if (t.lock_right_message) {
+        el.panelMessage.textContent = t.lock_right_message;
+      }
+      if (t.lock_background_image) {
+        el.bg.style.backgroundImage = `url("${t.lock_background_image}")`;
+      } else {
+        el.bg.style.backgroundImage = 'none';
+      }
+      if (t.lock_logo_image) {
+        el.logo.src = t.lock_logo_image;
+        el.logo.style.display = 'block';
+      } else {
+        el.logo.removeAttribute('src');
+        el.logo.style.display = 'none';
+      }
+    }
+
+    function applyStatus(status = {}) {
+      const stateName = String(status.state || '').toLowerCase();
+      if (status.helper) el.helper.textContent = status.helper;
+      if (status.panel_message) el.panelMessage.textContent = status.panel_message;
+      if (status.workstation) el.workstation.textContent = `Computer: ${status.workstation}`;
+
+      if (stateName === 'failed') {
+        showAlert(status.message || 'Authentication failed.');
+        state.submitting = false;
+      } else if (stateName === 'authenticating') {
+        showAlert(status.message || 'Authenticating…', state.theme.lock_color_info || '#4A9EFF');
+        state.submitting = true;
+      } else if (stateName === 'success') {
+        showAlert(status.message || 'Authentication successful.', state.theme.lock_color_success || '#4CAF50');
+      } else {
+        showAlert('');
+        if (stateName === 'ready') state.submitting = false;
+      }
+
+      el.unlockBtn.disabled = !!state.submitting;
+      el.username.disabled = !!state.submitting;
+      el.password.disabled = !!state.submitting;
+    }
+
+    async function fetchTheme() {
+      const resp = await fetch('/theme', { cache: 'no-store' });
+      if (!resp.ok) return;
+      const payload = await resp.json();
+      applyTheme(payload);
+    }
+
+    async function fetchStatus() {
+      const resp = await fetch('/status', { cache: 'no-store' });
+      if (!resp.ok) return;
+      const payload = await resp.json();
+      const hash = JSON.stringify(payload);
+      if (hash !== state.lastStatusHash) {
+        state.lastStatusHash = hash;
+        applyStatus(payload);
+      }
+    }
+
+    async function submitLogin(event) {
+      event.preventDefault();
+      const username = el.username.value.trim();
+      const password = el.password.value;
+      if (!username) {
+        showAlert('Username is required.');
+        return;
+      }
+      if (!password) {
+        showAlert('Password is required.');
+        return;
+      }
+      state.submitting = true;
+      applyStatus({ state: 'authenticating', message: 'Authenticating…' });
+      try {
+        const resp = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          showAlert(payload.message || 'Authentication failed.');
+          state.submitting = false;
+        }
+      } catch {
+        showAlert('Cannot reach local lock shell service.');
+        state.submitting = false;
+      }
+      applyStatus({ state: state.submitting ? 'authenticating' : 'failed' });
+    }
+
+    async function requestLock() {
+      try {
+        await fetch('/lock', { method: 'POST' });
+      } catch {}
+    }
+
+    function initialize() {
+      el.loginForm.addEventListener('submit', submitLogin);
+      el.username.addEventListener('input', setTypingMode);
+      el.password.addEventListener('input', setTypingMode);
+      el.menuBtn.addEventListener('click', requestLock);
+      setTypingMode();
+      fetchTheme();
+      fetchStatus();
+      state.pollTimer = setInterval(fetchStatus, 1200);
+    }
+
+    window.oneSignShell = {
+      updateTheme: applyTheme,
+      applyStatus,
+    };
+
+    initialize();
+  </script>
+</body>
+</html>
