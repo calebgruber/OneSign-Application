@@ -145,7 +145,14 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('enrollment_mode', 'admin', 'Who can enroll cards: admin or user'),
 ('credential_provider_enabled', '0', 'Use external credential provider helper for workstation unlocks'),
 ('credential_provider_command', '', 'Command to invoke credential provider helper (receives JSON on stdin)'),
-('credential_provider_timeout_seconds', '20', 'Max seconds to wait for credential provider helper process')
+('credential_provider_timeout_seconds', '20', 'Max seconds to wait for credential provider helper process'),
+('lock_background_image', '', 'URL for custom lock overlay background image'),
+('lock_logo_image', '', 'URL for custom lock overlay logo image'),
+('lock_brand_name', 'Secure log in', 'Brand text shown on lock overlay'),
+('lock_color_primary', '#2B4D89', 'Primary lock overlay background color'),
+('lock_color_panel', '#1D2A43', 'Right panel lock overlay background color'),
+('lock_color_hex', '#F4F6FA', 'Hex tile background color on lock overlay'),
+('lock_color_text', '#FFFFFF', 'Primary text color on lock overlay')
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
 
 -- Generate a default API key

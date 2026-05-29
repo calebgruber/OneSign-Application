@@ -43,4 +43,11 @@ if ($requestedAt !== null) {
     // and correctly display the ping state. The key expires after its 120 s TTL.
 }
 
-jsonResponse(['ok' => true, 'ping_requested' => $pingRequested]);
+jsonResponse([
+    'ok' => true,
+    'ping_requested' => $pingRequested,
+    'settings' => [
+        'allow_password_fallback' => (bool)(int)getSetting('allow_password_fallback', '1'),
+        'ui' => getAgentUiSettings(),
+    ],
+]);

@@ -111,5 +111,6 @@ jsonResponse([
         'credential_provider_enabled'        => (bool)(int)getSetting('credential_provider_enabled', '0'),
         'credential_provider_command'        => getSetting('credential_provider_command', ''),
         'credential_provider_timeout_seconds'=> (int)getSetting('credential_provider_timeout_seconds', '20'),
+        'ui'                                 => getAgentUiSettings(),
     ],
 ]);

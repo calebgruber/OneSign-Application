@@ -42,7 +42,6 @@ sys.path.insert(0, str(_BASE))
 
 from pcprox    import PcProxReader, PcProxError
 from win_login import (
-    lock_workstation,
     unlock_workstation,
     is_workstation_locked,
 )
@@ -119,6 +118,13 @@ DEFAULT_CONFIG = {
     },
     "ui": {
         "fullscreen_shell_enabled": "true",
+        "lock_background_image": "",
+        "lock_logo_image": "",
+        "lock_brand_name": "Secure log in",
+        "lock_color_primary": "#2B4D89",
+        "lock_color_panel": "#1D2A43",
+        "lock_color_hex": "#F4F6FA",
+        "lock_color_text": "#FFFFFF",
     },
     "updates": {
         "enabled": "true",
@@ -206,7 +212,12 @@ class OneSignAgent:
         self._last_notified_update_commit: str | None = None
         self._current_commit = self._resolve_local_commit()
         self._current_version = APP_VERSION
-        self.session_shell = SessionShell(on_lock_requested=self._lock_from_session_shell)
+        self._ui_settings = dict(self.config.items("ui")) if self.config.has_section("ui") else {}
+        self.session_shell = SessionShell(
+            on_lock_requested=self._lock_from_session_shell,
+            on_password_login=self._handle_password_login,
+        )
+        self.session_shell.set_theme(self._ui_settings)
 
     def get_server_base_url(self) -> str:
         raw = self.config.get("server", "url", fallback="http://localhost").strip()
@@ -251,10 +262,26 @@ class OneSignAgent:
             return False, f"Could not clear log: {exc}"
 
     def _lock_from_session_shell(self):
-        lock_workstation()
-        self.session_shell.hide()
+        self.session_shell.show_lock(HOSTNAME)
         self._active_session_card = None
-        self.tray.set_status("locked", "OneSign — Workstation locked")
+        self.tray.set_status("locked", "OneSign — Workstation locked by agent")
+
+    def _apply_server_settings(self, payload: dict[str, Any] | None):
+        if not isinstance(payload, dict):
+            return
+        settings = payload.get("settings")
+        if not isinstance(settings, dict):
+            return
+        ui = settings.get("ui")
+        if isinstance(ui, dict):
+            normalized = {}
+            for key, val in ui.items():
+                if val is None:
+                    continue
+                normalized[str(key)] = str(val)
+            if normalized:
+                self._ui_settings.update(normalized)
+                self.session_shell.set_theme(self._ui_settings)
 
     def get_status_summary(self) -> str:
         reader_state = "Connected" if self._reader_connected else "Disconnected"
@@ -621,6 +648,11 @@ class OneSignAgent:
             self._last_server_error = f"HTTP {resp.status_code}"
             return False, f"Server returned HTTP {resp.status_code}"
 
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        self._apply_server_settings(data if isinstance(data, dict) else {})
         self._server_connected = True
         self._last_server_error = ""
         return True, "Heartbeat OK"
@@ -652,12 +684,6 @@ class OneSignAgent:
         logger.info("OneSign Agent starting on %s", HOSTNAME)
         self.tray.notify("OneSign Agent", "Starting up…", duration=3)
         self.sync_with_server()
-        if (
-            self.config.getboolean("ui", "fullscreen_shell_enabled", fallback=True)
-            and not is_workstation_locked()
-            and self.session_shell.available
-        ):
-            self.session_shell.show("Authenticated User", HOSTNAME)
 
         # Heartbeat thread
         t_hb = threading.Thread(target=self._heartbeat_loop, daemon=True)
@@ -743,16 +769,14 @@ class OneSignAgent:
                     locked = is_workstation_locked()
                     if not locked:
                         if self._active_session_card and card_hex == self._active_session_card:
-                            logger.info("Tap-out: workstation unlocked, locking for card %s", card_hex)
-                            self.tray.notify("OneSign", "Badge tapped — locking workstation.", duration=3)
-                            self.tray.set_status("locked", "OneSign — Workstation locked")
-                            lock_workstation()
-                            self.session_shell.hide()
+                            logger.info("Tap-out: activating agent lock overlay for card %s", card_hex)
+                            self.tray.notify("OneSign", "Badge tapped — locking screen.", duration=3)
+                            self.tray.set_status("locked", "OneSign — Screen locked")
+                            self.session_shell.show_lock(HOSTNAME)
                             self._active_session_card = None
                         else:
-                            logger.info("Tap switch-user: locking and authenticating card %s", card_hex)
-                            lock_workstation()
-                            time.sleep(0.5)
+                            logger.info("Tap switch-user: authenticating card %s", card_hex)
+                            self.session_shell.show_lock(HOSTNAME)
                             auth_ok = self._handle_auth(card_hex)
                             if auth_ok:
                                 self._active_session_card = card_hex
@@ -813,12 +837,14 @@ class OneSignAgent:
             self._server_connected = False
             self._last_server_error = str(exc)
             self.tray.notify("OneSign — Error", "Cannot reach server. Check network.", duration=5)
+            self.session_shell.notify_auth_failed("Cannot reach server.")
             self.tray.set_status("connected")
             return False
 
         self._server_connected = (resp.status_code == 200)
         if resp.status_code == 200:
             data = resp.json()
+            self._apply_server_settings(data if isinstance(data, dict) else {})
             if not data.get("authenticated"):
                 reason = data.get("reason", "unknown")
                 if reason == "card_not_found":
@@ -829,6 +855,7 @@ class OneSignAgent:
                     self.tray.notify("OneSign — Access Denied", "User account is disabled.", duration=5)
                 else:
                     self.tray.notify("OneSign — Access Denied", f"Authentication failed ({reason}).", duration=5)
+                self.session_shell.notify_auth_failed("Badge not recognized.")
                 self.tray.set_status("connected")
                 return False
 
@@ -851,25 +878,89 @@ class OneSignAgent:
             )
             self.tray.set_status("connected", f"OneSign — {fullname}")
 
-            ok = unlock_workstation(username, password, domain)
+            ok = True
+            if is_workstation_locked():
+                ok = unlock_workstation(username, password, domain)
 
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)
+                self.session_shell.notify_auth_failed("Authentication failed.")
                 self.tray.set_status("connected")
                 return False
-            if self.config.getboolean("ui", "fullscreen_shell_enabled", fallback=True):
-                self.session_shell.show(fullname, HOSTNAME)
+            self.session_shell.hide()
             return True
         elif resp.status_code == 401:
             logger.warning("Authentication failed due to API key issue")
             self.tray.notify("OneSign — Unauthorized", "API key rejected. Verify config.ini API key.", duration=6)
+            self.session_shell.notify_auth_failed("Agent API key rejected.")
             self.tray.set_status("connected")
             return False
         else:
             logger.error("Auth error %d: %s", resp.status_code, resp.text[:200])
             self.tray.notify("OneSign — Error", f"Server error ({resp.status_code}).", duration=5)
+            self.session_shell.notify_auth_failed("Server error during auth.")
             self.tray.set_status("connected")
             return False
+
+    def _handle_password_login(self, username: str, password: str):
+        username = (username or "").strip()
+        if not username or not password:
+            self.session_shell.notify_auth_failed("Username and password are required.")
+            return
+
+        url = self.get_server_base_url() + "/api/password_auth.php"
+        try:
+            resp = self._session.post(url, json={
+                "username": username,
+                "password": password,
+                "workstation": HOSTNAME,
+            }, timeout=self._session_timeout)
+        except requests.RequestException as exc:
+            self._server_connected = False
+            self._last_server_error = str(exc)
+            self.session_shell.notify_auth_failed("Cannot reach server.")
+            return
+
+        if resp.status_code != 200:
+            msg = "Authentication failed."
+            try:
+                payload = resp.json()
+                reason = str(payload.get("reason", "")).strip()
+                if reason == "password_fallback_disabled":
+                    msg = "Password login is disabled by admin."
+            except Exception:
+                pass
+            self.session_shell.notify_auth_failed(msg)
+            return
+
+        try:
+            data = resp.json()
+        except Exception:
+            self.session_shell.notify_auth_failed("Invalid server response.")
+            return
+
+        self._apply_server_settings(data if isinstance(data, dict) else {})
+        if not data.get("authenticated"):
+            self.session_shell.notify_auth_failed("Invalid username or password.")
+            return
+
+        creds = data.get("credentials") or {}
+        cred_username = creds.get("username", "")
+        cred_password = creds.get("password", "")
+        domain = creds.get("domain", ".")
+        full_name = (data.get("user") or {}).get("full_name", username)
+
+        unlock_ok = True
+        if is_workstation_locked():
+            unlock_ok = bool(cred_username and cred_password and unlock_workstation(cred_username, cred_password, domain))
+        if not unlock_ok:
+            self.session_shell.notify_auth_failed("Windows login failed.")
+            return
+
+        self._active_session_card = None
+        self.tray.notify("OneSign — Welcome", f"Logging in as {full_name}…", duration=4)
+        self.tray.set_status("connected", f"OneSign — {full_name}")
+        self.session_shell.hide()
 
     # ── Enrollment mode ───────────────────────────────────────────────────────
 

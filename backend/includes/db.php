@@ -15,6 +15,18 @@ function getSetting(string $key, string $default = ''): string {
     return $row ? (string)$row['setting_value'] : $default;
 }
 
+function getAgentUiSettings(): array {
+    return [
+        'lock_background_image' => getSetting('lock_background_image', ''),
+        'lock_logo_image'       => getSetting('lock_logo_image', ''),
+        'lock_brand_name'       => getSetting('lock_brand_name', 'Secure log in'),
+        'lock_color_primary'    => getSetting('lock_color_primary', '#2B4D89'),
+        'lock_color_panel'      => getSetting('lock_color_panel', '#1D2A43'),
+        'lock_color_hex'        => getSetting('lock_color_hex', '#F4F6FA'),
+        'lock_color_text'       => getSetting('lock_color_text', '#FFFFFF'),
+    ];
+}
+
 function logAudit(string $eventType, ?int $userId, ?string $cardId,
                   ?string $workstation, ?string $ip, ?string $details,
                   bool $success = true): void {

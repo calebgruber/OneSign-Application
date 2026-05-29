@@ -9,10 +9,31 @@ $pageTitle = 'Settings';
 
 $saved = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $keys = ['app_name','lock_on_remove','lock_delay_seconds','session_timeout_minutes','allow_password_fallback','enrollment_mode','credential_provider_enabled','credential_provider_command','credential_provider_timeout_seconds'];
+    $keys = [
+        'app_name',
+        'lock_on_remove',
+        'lock_delay_seconds',
+        'session_timeout_minutes',
+        'allow_password_fallback',
+        'enrollment_mode',
+        'credential_provider_enabled',
+        'credential_provider_command',
+        'credential_provider_timeout_seconds',
+        'lock_background_image',
+        'lock_logo_image',
+        'lock_brand_name',
+        'lock_color_primary',
+        'lock_color_panel',
+        'lock_color_hex',
+        'lock_color_text',
+    ];
     foreach ($keys as $k) {
         if (isset($_POST[$k])) {
-            db()->prepare('UPDATE settings SET setting_value=? WHERE setting_key=?')->execute([$_POST[$k], $k]);
+            db()->prepare('
+                INSERT INTO settings (setting_key, setting_value, description)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+            ')->execute([$k, (string)$_POST[$k], '']);
         }
     }
     if (!empty($_POST['encryption_key']) && $_SESSION['admin_role'] === 'superadmin') {
@@ -177,6 +198,59 @@ include __DIR__ . '/../includes/header.php';
               <label class="form-label">Helper timeout (seconds)</label>
               <input type="number" name="credential_provider_timeout_seconds" class="form-control" min="1" max="120"
                 value="<?= (int)($s['credential_provider_timeout_seconds'] ?? 20) ?>">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lock Screen Branding -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="ti ti-palette me-2 text-blue"></i>Lock Screen Branding</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              These settings are synced by agents and applied to the full-screen lock overlay.
+            </p>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <label class="form-label">Background image URL</label>
+                <input type="url" name="lock_background_image" class="form-control"
+                  placeholder="https://..."
+                  value="<?= htmlspecialchars($s['lock_background_image'] ?? '') ?>">
+              </div>
+              <div class="col-lg-6">
+                <label class="form-label">Logo image URL</label>
+                <input type="url" name="lock_logo_image" class="form-control"
+                  placeholder="https://..."
+                  value="<?= htmlspecialchars($s['lock_logo_image'] ?? '') ?>">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Brand text</label>
+                <input type="text" name="lock_brand_name" class="form-control"
+                  value="<?= htmlspecialchars($s['lock_brand_name'] ?? 'Secure log in') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Primary color</label>
+                <input type="color" name="lock_color_primary" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_primary'] ?? '#2B4D89') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Right panel color</label>
+                <input type="color" name="lock_color_panel" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_panel'] ?? '#1D2A43') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Hex card color</label>
+                <input type="color" name="lock_color_hex" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_hex'] ?? '#F4F6FA') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Text color</label>
+                <input type="color" name="lock_color_text" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_text'] ?? '#FFFFFF') ?>">
+              </div>
             </div>
           </div>
         </div>
