@@ -1,4 +1,5 @@
 import io
+import itertools
 import json
 import logging
 import mimetypes
@@ -65,6 +66,7 @@ class SessionShell:
             "state": "hidden",
             "helper": "Tap your badge or sign in with Windows credentials.",
             "message": "Ready to unlock.",
+            "title": "",
             "panel_message": str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
             "workstation": "Unknown",
             "display_name": "",
@@ -325,15 +327,17 @@ class SessionShell:
             if command == "show_lock":
                 workstation = str(args[0] or "Unknown")
                 self._set_status(
-                    state="ready",
-                    helper="Tap your badge or sign in with Windows credentials.",
-                    message="Ready to unlock.",
+                    state="locking",
+                    helper="Locking workstation...",
+                    message="Locking workstation...",
+                    title="Locking workstation...",
                     panel_message=str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
                     workstation=workstation,
                     display_name="",
                 )
                 self._sync_web_theme()
                 self._sync_web_status()
+                threading.Timer(0.9, lambda: self._queue.put(("lock_ready", (workstation,)))).start()
                 window = self._webview_window
                 if window is not None:
                     try:
@@ -354,12 +358,24 @@ class SessionShell:
                 payload = args[0] or {}
                 self._theme.update(payload)
                 self._sync_web_theme()
+            elif command == "lock_ready":
+                workstation = str(args[0] or self._get_status().get("workstation") or "Unknown")
+                self._set_status(
+                    state="ready",
+                    helper="Tap your badge or sign in with Windows credentials.",
+                    message="Ready to unlock.",
+                    title="",
+                    panel_message=str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
+                    workstation=workstation,
+                )
+                self._sync_web_status()
             elif command == "auth_failed":
                 message = str(args[0] or "Authentication failed.")
                 self._set_status(
                     state="failed",
                     helper="Tap your badge or sign in with Windows credentials.",
                     message=message,
+                    title="",
                     panel_message=str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
                 )
                 self._sync_web_status()
@@ -368,8 +384,9 @@ class SessionShell:
                 self._set_status(
                     state="success",
                     helper="Authentication complete.",
-                    message=f"Welcome, {display_name}",
-                    panel_message="Loading your secure workspace…",
+                    message="Authenticating user, loading workspace...",
+                    title=f"Welcome, {display_name}",
+                    panel_message="Authenticating user, loading workspace...",
                     display_name=display_name,
                 )
                 self._sync_web_status()
@@ -379,7 +396,8 @@ class SessionShell:
                 self._set_status(
                     state="authenticating",
                     helper="Verifying your credentials with OneSign.",
-                    message="Authenticating…",
+                    message="Authenticating user, loading workspace...",
+                    title="Authenticating user, loading workspace...",
                 )
                 self._sync_web_status()
                 if callable(self._on_password_login):
@@ -425,7 +443,7 @@ class SessionShell:
             self._ready.set()
 
     def _run_ui(self):
-        if webview is not None:
+        if webview is not None and threading.current_thread() is threading.main_thread():
             try:
                 self._run_webview_ui()
                 return
@@ -436,6 +454,8 @@ class SessionShell:
                     self._running = False
                     self._ready.set()
                     return
+        elif webview is not None:
+            logger.info("Skipping pywebview lock shell because UI is not running on the main thread.")
 
         root = None
         try:
@@ -595,10 +615,36 @@ class SessionShell:
                 justify="left",
             )
             status_lbl.pack(anchor="w", fill="x", pady=(16, 0))
+            status_title_var = tk.StringVar(value="")
+            status_title_lbl = tk.Label(
+                left_inner,
+                textvariable=status_title_var,
+                fg=self._theme["lock_color_text"],
+                bg=self._theme["lock_color_primary"],
+                font=("Segoe UI", 16, "bold"),
+                anchor="w",
+                justify="left",
+            )
+            status_title_lbl.pack(anchor="w", fill="x", pady=(12, 0))
+            loader_var = tk.StringVar(value="")
+            loader_lbl = tk.Label(
+                left_inner,
+                textvariable=loader_var,
+                fg=self._theme["lock_color_text"],
+                bg=self._theme["lock_color_primary"],
+                font=("Segoe UI", 11),
+                anchor="w",
+                justify="left",
+            )
+            loader_lbl.pack(anchor="w", fill="x", pady=(6, 0))
 
             bg_image_ref = None
             logo_image_ref = None
             success_after_ids: list[str] = []
+            loader_after_id: str | None = None
+            loader_states = {"locking", "authenticating", "success"}
+            spinner = itertools.cycle(("", ".", "..", "..."))
+            current_loader_state = "ready"
 
             def _hex_points(cx: float, cy: float, size: float) -> list[float]:
                 return [
@@ -664,6 +710,7 @@ class SessionShell:
                 left_inner.place(x=inner_x, y=inner_y, width=inner_width, height=inner_height)
                 helper_lbl.configure(wraplength=max(240, inner_width - 20))
                 status_lbl.configure(wraplength=max(240, inner_width - 20))
+                status_title_lbl.configure(wraplength=max(240, inner_width - 20))
                 panel_message.configure(wraplength=max(160, int(width * 0.20)))
                 hex_canvas.configure(height=max(220, min(340, int(inner_width * 0.46))))
                 _draw_hexagons()
@@ -680,11 +727,48 @@ class SessionShell:
                 panel_message.configure(bg=self._theme["lock_color_panel"], fg=self._theme["lock_color_text"])
                 workstation_lbl.configure(bg=self._theme["lock_color_panel"], fg=self._theme["lock_color_text"])
                 status_lbl.configure(bg=self._theme["lock_color_primary"], fg=self._theme["lock_color_text"])
+                status_title_lbl.configure(bg=self._theme["lock_color_primary"], fg=self._theme["lock_color_text"])
+                loader_lbl.configure(bg=self._theme["lock_color_primary"], fg=self._theme["lock_color_text"])
                 login_frame.configure(bg=self._theme["lock_color_primary"])
                 username_entry.configure(bg=self._theme["lock_color_hex"])
                 password_entry.configure(bg=self._theme["lock_color_hex"])
                 submit_btn.configure(bg=self._theme["lock_color_panel"])
                 _layout_shell()
+
+            def _stop_loader():
+                nonlocal loader_after_id
+                if loader_after_id:
+                    try:
+                        root.after_cancel(loader_after_id)
+                    except Exception:
+                        pass
+                    loader_after_id = None
+                loader_var.set("")
+
+            def _start_loader():
+                nonlocal loader_after_id
+                _stop_loader()
+
+                def _tick():
+                    nonlocal loader_after_id
+                    if current_loader_state not in loader_states:
+                        loader_after_id = None
+                        return
+                    loader_var.set(f"Loading{next(spinner)}")
+                    loader_after_id = root.after(350, _tick)
+
+                _tick()
+
+            def _set_stage(state: str, title: str = "", message: str = ""):
+                nonlocal current_loader_state
+                current_loader_state = state
+                status_title_var.set(title)
+                status_lbl.configure(font=("Segoe UI", 11, "bold" if state in loader_states else "normal"))
+                status_var.set(message)
+                if state in loader_states:
+                    _start_loader()
+                else:
+                    _stop_loader()
 
             def _resolve_local_image(source: str) -> Path | None:
                 raw = (source or "").strip()
@@ -764,7 +848,7 @@ class SessionShell:
                     return "break"
                 _clear_success_timers()
                 _set_form_state("disabled")
-                status_var.set("Authenticating…")
+                _set_stage("authenticating", "", "Authenticating user, loading workspace...")
                 helper_var.set("Verifying your credentials with OneSign.")
                 if callable(self._on_password_login):
                     threading.Thread(target=self._on_password_login, args=(username, password), daemon=True).start()
@@ -807,20 +891,21 @@ class SessionShell:
                 _set_form_state("normal")
                 username_var.set("")
                 password_var.set("")
-                helper_var.set("Tap your badge or sign in with Windows credentials.")
-                status_var.set("Ready to unlock.")
+                helper_var.set("Locking workstation...")
+                _set_stage("locking", "", "Locking workstation...")
                 panel_message_var.set("Welcome back.\nSingle Sign On is ready when you are.")
                 workstation_var.set(f"Computer: {workstation}")
                 _layout_shell()
-                username_entry.focus_set()
+                success_after_ids.append(root.after(900, lambda: _set_stage("ready", "", "Ready to unlock.")))
+                success_after_ids.append(root.after(900, lambda: helper_var.set("Tap your badge or sign in with Windows credentials.")))
+                success_after_ids.append(root.after(900, username_entry.focus_set))
 
             def _begin_success_state(display_name: str):
                 _clear_success_timers()
                 _set_form_state("disabled")
                 helper_var.set("Authentication complete.")
-                status_var.set(f"Welcome, {display_name}")
-                panel_message_var.set("Loading your secure workspace…")
-                success_after_ids.append(root.after(700, lambda: status_var.set("Loading your workspace…")))
+                _set_stage("success", f"Welcome, {display_name}", "Authenticating user, loading workspace...")
+                panel_message_var.set("Authenticating user, loading workspace...")
                 success_after_ids.append(root.after(1800, lambda: self._queue.put(("hide", ()))))
 
             def _on_resize(_evt=None):
@@ -846,6 +931,7 @@ class SessionShell:
                             root.focus_force()
                         elif command == "hide":
                             _clear_success_timers()
+                            _stop_loader()
                             root.withdraw()
                         elif command == "theme":
                             payload = args[0] or {}
@@ -857,7 +943,7 @@ class SessionShell:
                             _clear_success_timers()
                             _set_form_state("normal")
                             helper_var.set("Tap your badge or sign in with Windows credentials.")
-                            status_var.set(message)
+                            _set_stage("failed", "", message)
                             password_var.set("")
                             password_entry.focus_set()
                         elif command == "auth_success":

@@ -30,6 +30,28 @@
     .left { position: relative; padding: 8vh 6vw 5vh; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
     .headline { font-size: clamp(30px, 4.6vh, 52px); font-weight: 700; margin: 0; }
     .helper { margin: 0; opacity: 0.9; font-size: clamp(13px, 1.55vh, 21px); }
+    .status-title { margin: 0; font-size: clamp(22px, 3.2vh, 42px); font-weight: 700; min-height: 1.2em; }
+    .status-line {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: clamp(14px, 1.8vh, 24px);
+      font-weight: 700;
+      min-height: 1.4em;
+    }
+    .loader {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: var(--text);
+      border-radius: 50%;
+      display: none;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    .status-line.loading .loader { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .hex-wrap {
       margin-top: 8px;
@@ -140,6 +162,8 @@
       <section class="left">
         <h1 class="headline" id="headline">Secure log in</h1>
         <p class="helper" id="helper">Tap your badge or sign in with Windows credentials.</p>
+        <h2 class="status-title" id="statusTitle"></h2>
+        <p class="status-line" id="statusLine"><span class="loader" id="statusLoader"></span><span id="statusMessage">Ready to unlock.</span></p>
 
         <div class="hex-wrap">
           <article class="hex"><div class="icon">🪪</div><div class="title">Tap Badge</div><div class="sub">Fast access</div></article>
@@ -175,6 +199,10 @@
       logo: document.getElementById('logo'),
       headline: document.getElementById('headline'),
       helper: document.getElementById('helper'),
+      statusTitle: document.getElementById('statusTitle'),
+      statusLine: document.getElementById('statusLine'),
+      statusLoader: document.getElementById('statusLoader'),
+      statusMessage: document.getElementById('statusMessage'),
       panelTitle: document.getElementById('panelTitle'),
       panelMessage: document.getElementById('panelMessage'),
       workstation: document.getElementById('workstation'),
@@ -246,9 +274,15 @@
 
     function applyStatus(status = {}) {
       const stateName = String(status.state || '').toLowerCase();
+      const displayName = String(status.display_name || '').trim();
+      const statusTitle = String(status.title || '').trim();
       if (status.helper) el.helper.textContent = status.helper;
       if (status.panel_message) el.panelMessage.textContent = status.panel_message;
       if (status.workstation) el.workstation.textContent = `Computer: ${status.workstation}`;
+      el.statusTitle.textContent = statusTitle || (stateName === 'success' ? `Welcome, ${displayName || 'User'}` : '');
+      el.statusMessage.textContent = status.message || (stateName === 'locking' ? 'Locking workstation...' : 'Ready to unlock.');
+      const loading = stateName === 'locking' || stateName === 'authenticating' || stateName === 'success';
+      el.statusLine.classList.toggle('loading', loading);
 
       if (stateName === 'failed') {
         showAlert(status.message || 'Authentication failed.');
