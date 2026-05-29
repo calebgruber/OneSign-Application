@@ -54,13 +54,18 @@ class SessionShell:
             "lock_color_panel": "#1D2A43",
             "lock_color_hex": "#F4F6FA",
             "lock_color_text": "#FFFFFF",
+            "lock_color_alert": "#E53935",
+            "lock_color_info": "#4A9EFF",
+            "lock_color_success": "#4CAF50",
+            "lock_right_title": "OneSign",
+            "lock_right_message": "Welcome back.\nSingle Sign On is ready when you are.",
         }
         self._status_lock = threading.Lock()
         self._status = {
             "state": "hidden",
             "helper": "Tap your badge or sign in with Windows credentials.",
             "message": "Ready to unlock.",
-            "panel_message": "Welcome back.\nSingle Sign On is ready when you are.",
+            "panel_message": str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
             "workstation": "Unknown",
             "display_name": "",
         }
@@ -127,8 +132,12 @@ class SessionShell:
     def _lockscreen_asset_path(self) -> Path:
         if self._lockscreen_path.is_file():
             return self._lockscreen_path
-        fallback = Path(__file__).resolve().with_name("imprivata-login (1).html")
-        return fallback
+        base_dir = Path(__file__).resolve().parent
+        for name in ("imprivata-login.html", "imprivata-login (1).html"):
+            candidate = base_dir / name
+            if candidate.is_file():
+                return candidate
+        return base_dir / "lockscreen.html"
 
     def _resolve_local_image(self, source: str) -> Path | None:
         raw = (source or "").strip()
@@ -319,7 +328,7 @@ class SessionShell:
                     state="ready",
                     helper="Tap your badge or sign in with Windows credentials.",
                     message="Ready to unlock.",
-                    panel_message="Welcome back.\nSingle Sign On is ready when you are.",
+                    panel_message=str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
                     workstation=workstation,
                     display_name="",
                 )
@@ -351,7 +360,7 @@ class SessionShell:
                     state="failed",
                     helper="Tap your badge or sign in with Windows credentials.",
                     message=message,
-                    panel_message="Welcome back.\nSingle Sign On is ready when you are.",
+                    panel_message=str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
                 )
                 self._sync_web_status()
             elif command == "auth_success":
@@ -412,6 +421,8 @@ class SessionShell:
             self._webview_stop.set()
             self._webview_window = None
             self._stop_http_server()
+            self._running = False
+            self._ready.set()
 
     def _run_ui(self):
         if webview is not None:
