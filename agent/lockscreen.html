@@ -55,12 +55,11 @@
 
     .hex-wrap {
       margin-top: 8px;
-      width: min(46vw, 820px);
+      width: min(26vw, 320px);
       max-width: 100%;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(120px, 1fr));
-      gap: clamp(16px, 2.2vw, 34px);
-      align-items: center;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
     }
     .hex {
       aspect-ratio: 1 / 1.14;
@@ -74,7 +73,12 @@
       padding: 20% 10%;
       flex-direction: column;
       gap: 6px;
-      min-height: 160px;
+      width: clamp(140px, 18vw, 220px);
+      min-height: 150px;
+    }
+    .hex + .hex {
+      margin-top: clamp(-22px, -1.8vw, -12px);
+      margin-left: clamp(24px, 2.6vw, 40px);
     }
     .hex .icon { font-size: clamp(20px, 2.8vw, 36px); }
     .hex .title { font-weight: 700; font-size: clamp(12px, 1.6vw, 22px); }
@@ -150,7 +154,7 @@
     @media (max-width: 1100px) {
       .layout { grid-template-columns: 1fr; }
       .right { display: none; }
-      .hex-wrap { width: min(76vw, 700px); }
+      .hex-wrap { width: min(76vw, 320px); }
     }
   </style>
 </head>
@@ -166,9 +170,8 @@
         <p class="status-line" id="statusLine"><span class="loader" id="statusLoader"></span><span id="statusMessage">Ready to unlock.</span></p>
 
         <div class="hex-wrap">
-          <article class="hex"><div class="icon">🪪</div><div class="title">Tap Badge</div><div class="sub">Fast access</div></article>
-          <article class="hex"><div class="icon">🔐</div><div class="title">Unlock</div><div class="sub">Secure session</div></article>
-          <article class="hex"><div class="icon">💻</div><div class="title">SSO Ready</div><div class="sub">Windows sign-in</div></article>
+          <article class="hex"><div class="icon">🪪</div><div class="title">Tap badge</div><div class="sub">Fast access</div></article>
+          <article class="hex"><div class="icon">🔓</div><div class="title">Type username</div><div class="sub">Secure sign in</div></article>
         </div>
 
         <form class="login" id="loginForm" autocomplete="off">
