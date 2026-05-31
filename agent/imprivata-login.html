@@ -10,8 +10,8 @@
 //  CONFIGURATION — change anything here easily
 // ═══════════════════════════════════════════════
 const CONFIG = {
-  logoColor:           "#ce202f",
-  logoWordmark:        "imprivata",
+  backgroundImage:     "",
+  logoImage:           "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
   colorRedHex:         "#c92235",
   colorNavyHex:        "#000133",
   colorOverlay:        "rgba(0,0,0,0.50)",
@@ -49,14 +49,11 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   display:flex; align-items:center;
   gap:clamp(7px,0.8vw,12px);
 }
-.logo-top-right .logo-icon { width:clamp(26px,2.8vw,40px); height:clamp(26px,2.8vw,40px); flex-shrink:0; }
-.logo-top-right .logo-wordmark {
-  font-family:"Inter Display",sans-serif;
-  font-size:clamp(18px,2vw,28px);
-  font-weight:300; color:#fff;
-  letter-spacing:-0.01em; line-height:1; white-space:nowrap;
+.logo-top-right .logo-image {
+  width: clamp(120px, 14vw, 210px);
+  height: auto;
+  display: block;
 }
-.logo-top-right .logo-wordmark sup { font-size:0.4em; vertical-align:super; }
 
 /* ── Station ID bottom-right ── */
 .station-id {
@@ -88,13 +85,23 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 :root {
   --hex-h: clamp(140px, 14vw, 190px);   /* height of hex */
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
+  --hex-gap: 26px;
 }
 
-/* Each hex is absolutely positioned like the original layout */
-/* Original used: top:30.3vh left:8.9vw (navy top), top:47.1vh left:8.9vw (navy bot), top:38.7vh left:-4.3vw (red) */
+.hex-cluster {
+  position: absolute;
+  top: 30.3vh;
+  left: -4.3vw;
+  display: grid;
+  grid-template-columns: var(--hex-w) var(--hex-w);
+  grid-template-rows: var(--hex-h) var(--hex-h);
+  column-gap: var(--hex-gap);
+  row-gap: var(--hex-gap);
+  z-index: 4;
+}
 
 .hex {
-  position: absolute;
+  position: relative;
   width:  var(--hex-w);
   height: var(--hex-h);
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
@@ -103,11 +110,19 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   align-items: center;
   justify-content: center;
   gap: clamp(5px,0.6vh,9px);
+  z-index: 5;
 }
 
-.hex-red   { background: #c92235; top:38.7vh; left:-4.3vw; z-index:4; pointer-events:none; }
-.hex-navy-top { background: #000133; top:30.3vh; left:8.9vw;  z-index:5; }
-.hex-navy-bot { background: #000133; top:47.1vh; left:8.9vw;  z-index:5; }
+.hex-red {
+  background: #c92235;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  z-index: 4;
+  pointer-events: none;
+}
+.hex-navy-top { background: #000133; grid-column: 2; grid-row: 1; }
+.hex-navy-bot { background: #000133; grid-column: 2; grid-row: 2; }
 
 /* Content inside hexes */
 .hex .hex-icon svg {
@@ -167,24 +182,18 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 .state-typing.active { display:flex; }
 .state-default.hidden { display:none; }
 
-/* ── Left slab text (sits over red hex) ── */
+/* ── Red slab text/logo ── */
 .secure-slab-text {
-  position: absolute;
-  top: 47.5vh;
-  left: 0.8vw;
-  z-index: 9;
-  pointer-events: none;
+  width: 100%;
+  padding: 0 14%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(5px, 0.6vh, 10px);
 }
-.secure-slab-text .slab-brand {
-  display: flex; align-items: center; gap: 5px; margin-bottom: 4px;
-}
-.secure-slab-text .slab-icon { width:clamp(12px,1.3vw,18px); height:clamp(12px,1.3vw,18px); flex-shrink:0; }
-.secure-slab-text .slab-wordmark {
-  font-family: "Inter Display", sans-serif;
-  font-size: clamp(8px,0.85vw,12px);
-  font-weight: 400; color: #fff; letter-spacing: 0.01em; line-height: 1;
-}
-.secure-slab-text .slab-wordmark sup { font-size: 0.5em; vertical-align: super; }
+.secure-slab-text .slab-logo { width: clamp(52px, 6vw, 86px); height: auto; display: block; }
 .secure-slab-text .secure-title {
   font-family: "Inter Display", sans-serif;
   font-size: clamp(14px,1.6vw,23px);
@@ -201,7 +210,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   z-index: 10; cursor: pointer; transition: background 0.15s;
 }
 .menu-btn:hover { background: rgba(255,255,255,0.08); }
-.menu-btn .menu-icon { width:clamp(16px,1.6vw,22px); height:clamp(16px,1.6vw,22px); flex-shrink:0; }
+.menu-btn .menu-logo { width:clamp(18px,1.9vw,28px); height:auto; flex-shrink:0; display:block; }
 .menu-btn .menu-label {
   font-family: "Inter Display", sans-serif;
   font-size: clamp(12px,1.3vw,18px);
@@ -224,14 +233,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 .transition-screen.visible { opacity:1; pointer-events:auto; }
 
 .ts-logo { display:flex; align-items:center; gap:clamp(10px,1.2vw,18px); }
-.ts-logo svg { width:clamp(36px,4vw,56px); height:clamp(36px,4vw,56px); flex-shrink:0; }
-.ts-wordmark {
-  font-family:"Inter Display",sans-serif;
-  font-size:clamp(24px,3vw,40px);
-  font-weight:300; color:#fff;
-  letter-spacing:-0.01em; line-height:1;
-}
-.ts-wordmark sup { font-size:0.38em; vertical-align:super; }
+.ts-logo-image { width:clamp(46px,5vw,72px); height:auto; display:block; }
 
 .ts-divider { width:clamp(80px,10vw,160px); height:1px; background:rgba(255,255,255,0.12); }
 
@@ -259,12 +261,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
   <!-- Top-right logo -->
   <div class="logo-top-right">
-    <svg class="logo-icon" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-      <path fill="none" d="M0,0H150V150H0V0Z"/>
-      <path id="logoPathTop" fill="#ce202f" d="M28.95,34.25v93.75H122.8V34.25H28.95Zm59.32,84.82h-24.79V42.87h24.79V119.08h0Z"/>
-      <rect id="logoRectTop" fill="#ce202f" x="63.48" y="5.5" width="24.78" height="19.36"/>
-    </svg>
-    <span class="logo-wordmark" id="wordmarkTop"></span>
+    <img class="logo-image" id="logoTopImage" alt="OneSign logo">
   </div>
 
   <!-- Station ID -->
@@ -272,57 +269,47 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
     <span id="stationLabelEl"></span>&nbsp;&nbsp;<span id="stationIDEl"></span>
   </div>
 
-  <!-- Red hex (slab effect, partially off-screen left) -->
-  <div class="hex hex-red"></div>
-
-  <!-- Navy hex upper — Tap Badge -->
-  <div class="hex hex-navy-top">
-    <div class="hex-icon">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM9 10c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3zm6 4H9c-1.1 0-2 .45-2 1v.5h10V15c0-.55-.9-1-2-1z"/>
-      </svg>
+  <div class="hex-cluster">
+    <!-- Red hex (slab effect, partially off-screen left) -->
+    <div class="hex hex-red">
+      <div class="secure-slab-text">
+        <img class="slab-logo" id="slabLogoImage" alt="OneSign logo">
+        <div class="secure-title">Secure<br>Log In</div>
+      </div>
     </div>
-    <div class="hex-label" id="tapBadgeLabelEl"></div>
-  </div>
 
-  <!-- Navy hex lower — Network Username -->
-  <div class="hex hex-navy-bot">
-    <div class="state-default" id="stateDefault">
+    <!-- Navy hex upper — Tap Badge -->
+    <div class="hex hex-navy-top">
       <div class="hex-icon">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+          <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM9 10c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3zm6 4H9c-1.1 0-2 .45-2 1v.5h10V15c0-.55-.9-1-2-1z"/>
         </svg>
       </div>
-      <div class="hex-label-u" id="usernameLabelEl"></div>
-      <input class="hex-input" id="usernameInput" type="text" autocomplete="username">
+      <div class="hex-label" id="tapBadgeLabelEl"></div>
     </div>
-    <div class="state-typing" id="stateTyping">
-      <input class="hex-input" id="usernameInputTyping" type="text" placeholder="Username" autocomplete="username">
-      <input class="hex-pass"  id="passwordInput" type="password" placeholder="Password" autocomplete="current-password">
-      <button class="hex-submit" id="submitBtn" type="button">Log In</button>
-    </div>
-  </div>
 
-  <!-- Secure Log In text over red hex -->
-  <div class="secure-slab-text">
-    <div class="slab-brand">
-      <svg class="slab-icon" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-        <path fill="none" d="M0,0H150V150H0V0Z"/>
-        <path fill="#fff" d="M28.95,34.25v93.75H122.8V34.25H28.95Zm59.32,84.82h-24.79V42.87h24.79V119.08h0Z"/>
-        <rect fill="#fff" x="63.48" y="5.5" width="24.78" height="19.36"/>
-      </svg>
-      <span class="slab-wordmark" id="slabWordmark"></span>
+    <!-- Navy hex lower — Network Username -->
+    <div class="hex hex-navy-bot">
+      <div class="state-default" id="stateDefault">
+        <div class="hex-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+          </svg>
+        </div>
+        <div class="hex-label-u" id="usernameLabelEl"></div>
+        <input class="hex-input" id="usernameInput" type="text" autocomplete="username">
+      </div>
+      <div class="state-typing" id="stateTyping">
+        <input class="hex-input" id="usernameInputTyping" type="text" placeholder="Username" autocomplete="username">
+        <input class="hex-pass"  id="passwordInput" type="password" placeholder="Password" autocomplete="current-password">
+        <button class="hex-submit" id="submitBtn" type="button">Log In</button>
+      </div>
     </div>
-    <div class="secure-title">Secure<br>Log In</div>
   </div>
 
   <!-- Menu button -->
   <div class="menu-btn" id="menuBtn">
-    <svg class="menu-icon" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-      <path fill="none" d="M0,0H150V150H0V0Z"/>
-      <path fill="#fff" d="M28.95,34.25v93.75H122.8V34.25H28.95Zm59.32,84.82h-24.79V42.87h24.79V119.08h0Z"/>
-      <rect fill="#fff" x="63.48" y="5.5" width="24.78" height="19.36"/>
-    </svg>
+    <img class="menu-logo" id="menuLogoImage" alt="OneSign logo">
     <span class="menu-label">Menu</span>
   </div>
 
@@ -331,12 +318,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 <!-- LOGIN transition screen -->
 <div class="transition-screen" id="loginScreen">
   <div class="ts-logo">
-    <svg viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-      <path fill="none" d="M0,0H150V150H0V0Z"/>
-      <path fill="#ce202f" id="tsLogoPath" d="M28.95,34.25v93.75H122.8V34.25H28.95Zm59.32,84.82h-24.79V42.87h24.79V119.08h0Z"/>
-      <rect fill="#ce202f" id="tsLogoRect" x="63.48" y="5.5" width="24.78" height="19.36"/>
-    </svg>
-    <span class="ts-wordmark" id="tsWordmark"></span>
+    <img class="ts-logo-image" id="tsLogoImage" alt="OneSign logo">
   </div>
   <div class="ts-divider"></div>
   <div class="ts-spinner"></div>
@@ -346,12 +328,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 <!-- LOCK / LOGOUT transition screen -->
 <div class="transition-screen" id="lockScreen">
   <div class="ts-logo">
-    <svg viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-      <path fill="none" d="M0,0H150V150H0V0Z"/>
-      <path fill="#ce202f" id="lsLogoPath" d="M28.95,34.25v93.75H122.8V34.25H28.95Zm59.32,84.82h-24.79V42.87h24.79V119.08h0Z"/>
-      <rect fill="#ce202f" id="lsLogoRect" x="63.48" y="5.5" width="24.78" height="19.36"/>
-    </svg>
-    <span class="ts-wordmark" id="lsWordmark"></span>
+    <img class="ts-logo-image" id="lsLogoImage" alt="OneSign logo">
   </div>
   <div class="ts-divider"></div>
   <div class="ts-spinner"></div>
@@ -360,10 +337,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
 <script>
 (function applyConfig() {
-  const logoIds = ["logoPathTop","logoRectTop","tsLogoPath","tsLogoRect","lsLogoPath","lsLogoRect"];
+  const bgEl = document.querySelector(".bg-img");
+  if (CONFIG.backgroundImage) bgEl.src = CONFIG.backgroundImage;
+
+  const logoIds = ["logoTopImage", "slabLogoImage", "menuLogoImage", "tsLogoImage", "lsLogoImage"];
   logoIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.setAttribute("fill", CONFIG.logoColor);
+    if (el) el.src = CONFIG.logoImage;
   });
 
   document.querySelector(".hex-red").style.background = CONFIG.colorRedHex;
@@ -381,16 +361,6 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   document.getElementById("usernameLabelEl").textContent  = CONFIG.usernameLabel;
   document.getElementById("usernameInput").placeholder    = CONFIG.usernamePlaceholder;
   document.getElementById("usernameInputTyping").placeholder = CONFIG.usernamePlaceholder;
-
-  function setWordmark(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = CONFIG.logoWordmark;
-    const sup = document.createElement("sup");
-    sup.textContent = "®";
-    el.appendChild(sup);
-  }
-  ["wordmarkTop","slabWordmark","tsWordmark","lsWordmark"].forEach(setWordmark);
 })();
 
 // ── Login interaction ──
