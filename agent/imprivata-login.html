@@ -12,6 +12,7 @@
 const CONFIG = {
   backgroundImage:     "",
   logoImage:           "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
+  menuLogoImage:       "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
   colorRedHex:         "#c92235",
   colorNavyHex:        "#000133",
   colorOverlay:        "rgba(0,0,0,0.50)",
@@ -85,7 +86,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 :root {
   --hex-h: clamp(140px, 14vw, 190px);   /* height of hex */
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
-  --hex-gap: 26px;
+  --hex-gap: 2px;
 }
 
 .hex-cluster {
@@ -118,6 +119,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: center;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   z-index: 4;
   pointer-events: none;
 }
@@ -185,7 +189,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 /* ── Red slab text/logo ── */
 .secure-slab-text {
   width: 100%;
-  padding: 0 14%;
+  height: 100%;
+  padding: 0 12%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -340,11 +345,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   const bgEl = document.querySelector(".bg-img");
   if (CONFIG.backgroundImage) bgEl.src = CONFIG.backgroundImage;
 
-  const logoIds = ["logoTopImage", "slabLogoImage", "menuLogoImage", "tsLogoImage", "lsLogoImage"];
+  const logoIds = ["logoTopImage", "slabLogoImage", "tsLogoImage", "lsLogoImage"];
   logoIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.src = CONFIG.logoImage;
   });
+  const menuLogo = document.getElementById("menuLogoImage");
+  if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || CONFIG.logoImage;
 
   document.querySelector(".hex-red").style.background = CONFIG.colorRedHex;
   document.querySelectorAll(".hex-navy-top, .hex-navy-bot").forEach(el => el.style.background = CONFIG.colorNavyHex);
