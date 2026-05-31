@@ -678,20 +678,18 @@ class SessionShell:
                 width = max(320, hex_canvas.winfo_width())
                 height = max(220, hex_canvas.winfo_height())
                 size = max(44, min(width * 0.11, height * 0.24))
-                left_x = max(size + 16, width * 0.22)
+                left_x = max(size + 16, width * 0.28)
                 top_y = height * 0.34
-                bottom_y = top_y + size * 1.75
-                right_x = left_x + size * 1.85
-                right_y = (top_y + bottom_y) / 2
+                bottom_y = top_y + size * 1.62
+                bottom_x = left_x + size * 0.42
 
                 title_font = ("Segoe UI", max(11, int(size * 0.24)), "bold")
                 body_font = ("Segoe UI", max(9, int(size * 0.15)))
                 icon_font = ("Segoe UI Emoji", max(20, int(size * 0.42)))
 
                 tiles = [
-                    (left_x, top_y, "🪪", "Tap Badge", "Fast access"),
-                    (left_x, bottom_y, "🔐", "Unlock", "Secure session"),
-                    (right_x, right_y, "💻", "SSO Ready", "Windows sign-in"),
+                    (left_x, top_y, "🪪", "Tap badge", "Fast access"),
+                    (bottom_x, bottom_y, "🔓", "Type username", "Secure sign in"),
                 ]
                 for cx, cy, icon, title, subtitle in tiles:
                     hex_canvas.create_polygon(_hex_points(cx, cy, size), fill=hex_bg, outline=hex_bg)
