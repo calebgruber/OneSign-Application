@@ -51,7 +51,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   gap:clamp(7px,0.8vw,12px);
 }
 .logo-top-right .logo-image {
-  width: clamp(120px, 14vw, 210px);
+  width: clamp(160px, 18vw, 270px);
   height: auto;
   display: block;
 }
@@ -87,7 +87,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   --hex-h: clamp(132px, 13.5vw, 178px); /* height of hex */
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
   --hex-gap: 0px;
-  --hex-cluster-shift-x: 44px;
+  --hex-cluster-shift-x: 0px;
 }
 
 .hex-cluster {
@@ -95,7 +95,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   top: 29.8vh;
   left: calc(-4.3vw + var(--hex-cluster-shift-x));
   display: grid;
-  grid-template-columns: calc(var(--hex-w) * 0.94) var(--hex-w);
+  grid-template-columns: calc(var(--hex-w) * 0.75) var(--hex-w);
   grid-template-rows: var(--hex-h) var(--hex-h);
   column-gap: var(--hex-gap);
   row-gap: var(--hex-gap);
@@ -125,7 +125,6 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   padding: 0;
   z-index: 4;
   pointer-events: none;
-  transform: translateX(12%);
 }
 .hex-navy-top {
   background: #000133;
@@ -203,15 +202,15 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 .secure-slab-text {
   width: 100%;
   height: 100%;
-  padding: 0 9% 0 18%;
+  padding: 0 14% 0 8%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: center;
-  text-align: left;
+  text-align: right;
   gap: clamp(5px, 0.6vh, 10px);
 }
-.secure-slab-text .slab-logo { width: clamp(52px, 6vw, 86px); height: auto; display: block; }
+.secure-slab-text .slab-logo { width: clamp(64px, 7.5vw, 108px); height: auto; display: block; }
 .secure-slab-text .secure-title {
   font-family: "Inter Display", sans-serif;
   font-size: clamp(14px,1.6vw,23px);
