@@ -421,77 +421,278 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 </div>
 
 <script>
-(function applyConfig() {
-  const normalizeColor = (value, fallback) => {
-    const raw = String(value ?? "").trim();
-    if (!raw) return fallback;
-    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return raw;
-    if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return `#${raw}`;
-    return raw;
+const LIVE_HOSTS = new Set(["127.0.0.1", "localhost"]);
+const isLive = LIVE_HOSTS.has(window.location.hostname);
+
+const stateDefault = document.getElementById("stateDefault");
+const stateTyping = document.getElementById("stateTyping");
+const usernameInput = document.getElementById("usernameInput");
+const usernameTyping = document.getElementById("usernameInputTyping");
+const passwordInput = document.getElementById("passwordInput");
+const submitBtn = document.getElementById("submitBtn");
+const loginScreen = document.getElementById("loginScreen");
+const lockScreen = document.getElementById("lockScreen");
+const loginStatus = document.getElementById("loginStatus");
+const lockStatus = document.getElementById("lockStatus");
+const stationLabelEl = document.getElementById("stationLabelEl");
+const stationIDEl = document.getElementById("stationIDEl");
+const tapBadgeLabelEl = document.getElementById("tapBadgeLabelEl");
+const usernameLabelEl = document.getElementById("usernameLabelEl");
+const menuBtn = document.getElementById("menuBtn");
+const menuLogoImage = document.getElementById("menuLogoImage");
+const titleEl = document.querySelector(".secure-title");
+
+let transitioned = false;
+let loginInFlight = false;
+let currentTheme = { ...CONFIG };
+let currentStatus = {
+  state: "hidden",
+  workstation: String(CONFIG.stationID || ""),
+  helper: "",
+  message: "",
+  title: "",
+  panel_message: "",
+  display_name: "",
+};
+
+const normalizeColor = (value, fallback) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return raw;
+  if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return `#${raw}`;
+  return raw;
+};
+
+function resetCredentials() {
+  loginInFlight = false;
+  usernameTyping.value = "";
+  passwordInput.value = "";
+  usernameInput.value = "";
+  transitioned = false;
+  stateDefault.classList.remove("hidden");
+  stateTyping.classList.remove("active");
+  submitBtn.textContent = "Log In";
+  submitBtn.disabled = false;
+}
+
+function getThemeValue(theme, key, fallback = "") {
+  const value = theme?.[key];
+  return value == null ? fallback : String(value);
+}
+
+function buildTheme(themePayload = {}) {
+  const root = document.documentElement;
+  const computed = getComputedStyle(root);
+  const fallbackLeft = computed.getPropertyValue("--hex-left-color").trim() || "#c92235";
+  const fallbackTop = computed.getPropertyValue("--hex-top-color").trim() || "#000133";
+  const fallbackBottom = computed.getPropertyValue("--hex-bottom-color").trim() || "#000133";
+
+  const lockPrimary = getThemeValue(themePayload, "lock_color_primary", CONFIG.colorHexLeft || fallbackLeft);
+  const lockPanel = getThemeValue(themePayload, "lock_color_panel", CONFIG.colorHexTop || fallbackTop);
+
+  return {
+    ...CONFIG,
+    ...themePayload,
+    backgroundImage: getThemeValue(themePayload, "lock_background_image", CONFIG.backgroundImage),
+    logoImage: getThemeValue(themePayload, "lock_logo_image", CONFIG.logoImage),
+    menuLogoImage: CONFIG.menuLogoImage || getThemeValue(themePayload, "lock_logo_image", CONFIG.logoImage),
+    colorHexLeft: normalizeColor(
+      getThemeValue(themePayload, "lock_color_hex_left", getThemeValue(themePayload, "lock_color_hex", lockPrimary)),
+      fallbackLeft,
+    ),
+    colorHexTop: normalizeColor(
+      getThemeValue(themePayload, "lock_color_hex_top", getThemeValue(themePayload, "lock_color_hex", lockPanel)),
+      fallbackTop,
+    ),
+    colorHexBottom: normalizeColor(
+      getThemeValue(themePayload, "lock_color_hex_bottom", getThemeValue(themePayload, "lock_color_hex", lockPanel)),
+      fallbackBottom,
+    ),
+    colorOverlay: getThemeValue(themePayload, "lock_color_overlay", CONFIG.colorOverlay),
+    colorSubmitBtn: normalizeColor(getThemeValue(themePayload, "lock_color_submit", CONFIG.colorSubmitBtn), "#c9222e"),
+    stationLabel: CONFIG.stationLabel,
+    stationID: String(currentStatus.workstation || CONFIG.stationID || ""),
+    tapBadgeLabel: CONFIG.tapBadgeLabel,
+    usernameLabel: CONFIG.usernameLabel,
+    usernamePlaceholder: CONFIG.usernamePlaceholder,
+    brandName: getThemeValue(themePayload, "lock_brand_name", "Secure Log In"),
   };
+}
+
+function applyTheme(themePayload = {}) {
+  currentTheme = buildTheme(themePayload);
 
   const bgEl = document.querySelector(".bg-img");
-  if (CONFIG.backgroundImage) bgEl.src = CONFIG.backgroundImage;
+  if (bgEl && currentTheme.backgroundImage) bgEl.src = currentTheme.backgroundImage;
 
-  const logoIds = ["logoTopImage", "slabLogoImage", "tsLogoImage", "lsLogoImage"];
-  logoIds.forEach(id => {
+  ["logoTopImage", "slabLogoImage", "tsLogoImage", "lsLogoImage"].forEach((id) => {
     const el = document.getElementById(id);
-    if (el) el.src = CONFIG.logoImage;
+    if (el) el.src = currentTheme.logoImage;
   });
-  const menuLogo = document.getElementById("menuLogoImage");
-  if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || CONFIG.logoImage;
+  if (menuLogoImage) menuLogoImage.src = currentTheme.menuLogoImage || currentTheme.logoImage;
 
-  const rootEl = document.documentElement;
-  const rootStyle = rootEl.style;
-  const computedStyle = getComputedStyle(rootEl);
-  const leftFallback = computedStyle.getPropertyValue("--hex-left-color").trim() || "#c92235";
-  const topFallback = computedStyle.getPropertyValue("--hex-top-color").trim() || "#000133";
-  const bottomFallback = computedStyle.getPropertyValue("--hex-bottom-color").trim() || "#000133";
-  const leftColor = normalizeColor(CONFIG.colorHexLeft ?? CONFIG.colorRedHex, leftFallback);
-  const topColor = normalizeColor(CONFIG.colorHexTop ?? CONFIG.colorNavyHex, topFallback);
-  const bottomColor = normalizeColor(CONFIG.colorHexBottom ?? CONFIG.colorNavyHex, bottomFallback);
-  rootStyle.setProperty("--hex-left-color", leftColor);
-  rootStyle.setProperty("--hex-top-color", topColor);
-  rootStyle.setProperty("--hex-bottom-color", bottomColor);
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--hex-left-color", currentTheme.colorHexLeft);
+  rootStyle.setProperty("--hex-top-color", currentTheme.colorHexTop);
+  rootStyle.setProperty("--hex-bottom-color", currentTheme.colorHexBottom);
 
-  const hexSvgLeft   = document.getElementById("hexSvgLeft");
-  const hexSvgTop    = document.getElementById("hexSvgTop");
+  const hexSvgLeft = document.getElementById("hexSvgLeft");
+  const hexSvgTop = document.getElementById("hexSvgTop");
   const hexSvgBottom = document.getElementById("hexSvgBottom");
-  if (hexSvgLeft)   hexSvgLeft.setAttribute("fill", leftColor);
-  if (hexSvgTop)    hexSvgTop.setAttribute("fill", topColor);
-  if (hexSvgBottom) hexSvgBottom.setAttribute("fill", bottomColor);
+  if (hexSvgLeft) hexSvgLeft.setAttribute("fill", currentTheme.colorHexLeft);
+  if (hexSvgTop) hexSvgTop.setAttribute("fill", currentTheme.colorHexTop);
+  if (hexSvgBottom) hexSvgBottom.setAttribute("fill", currentTheme.colorHexBottom);
 
-  const clusterShift = String(CONFIG.hexClusterShiftX ?? "").trim();
-  if (clusterShift) {
-    rootStyle.setProperty("--hex-cluster-shift-x", clusterShift);
+  const clusterShift = String(currentTheme.hexClusterShiftX ?? "").trim();
+  if (clusterShift) rootStyle.setProperty("--hex-cluster-shift-x", clusterShift);
+
+  const overlay = document.getElementById("overlayFull");
+  if (overlay) overlay.style.background = currentTheme.colorOverlay;
+
+  submitBtn.style.background = currentTheme.colorSubmitBtn;
+  stationLabelEl.textContent = currentTheme.stationLabel;
+  stationIDEl.textContent = String(currentStatus.workstation || currentTheme.stationID || "");
+  tapBadgeLabelEl.textContent = currentTheme.tapBadgeLabel;
+  usernameLabelEl.textContent = currentTheme.usernameLabel;
+  usernameInput.placeholder = currentTheme.usernamePlaceholder;
+  usernameTyping.placeholder = currentTheme.usernamePlaceholder;
+
+  if (titleEl) {
+    const words = String(currentTheme.brandName || "Secure Log In").trim().split(/\s+/);
+    if (words.length > 1) {
+      titleEl.innerHTML = `${words.slice(0, -1).join(" ")}<br>${words[words.length - 1]}`;
+    } else {
+      titleEl.textContent = words[0] || "Secure Log In";
+    }
+  }
+}
+
+function setOverlayMessage(target, status) {
+  const helper = String(status?.helper || "").trim();
+  const message = String(status?.message || "").trim();
+  const title = String(status?.title || "").trim();
+  const panel = String(status?.panel_message || "").trim();
+  const text = title || message || helper || panel;
+  target.textContent = text || target.textContent;
+}
+
+function applyStatus(statusPayload = {}) {
+  currentStatus = { ...currentStatus, ...(statusPayload || {}) };
+  const state = String(currentStatus.state || "hidden").toLowerCase();
+  stationIDEl.textContent = String(currentStatus.workstation || currentTheme.stationID || "");
+
+  if (state === "hidden") {
+    loginScreen.classList.remove("visible");
+    lockScreen.classList.remove("visible");
+    resetCredentials();
+    return;
   }
 
-  const ov = document.getElementById("overlayFull");
-  ov.style.background = CONFIG.colorOverlay;
-  ov.style.opacity = "1";
+  if (state === "locking") {
+    setOverlayMessage(lockStatus, currentStatus);
+    lockScreen.classList.add("visible");
+    loginScreen.classList.remove("visible");
+    return;
+  }
 
-  document.getElementById("submitBtn").style.background = normalizeColor(CONFIG.colorSubmitBtn, "#c9222e");
+  if (state === "ready") {
+    lockScreen.classList.remove("visible");
+    loginScreen.classList.remove("visible");
+    resetCredentials();
+    usernameInput.focus();
+    return;
+  }
 
-  document.getElementById("stationLabelEl").textContent  = CONFIG.stationLabel;
-  document.getElementById("stationIDEl").textContent     = CONFIG.stationID;
-  document.getElementById("tapBadgeLabelEl").textContent  = CONFIG.tapBadgeLabel;
-  document.getElementById("usernameLabelEl").textContent  = CONFIG.usernameLabel;
-  document.getElementById("usernameInput").placeholder    = CONFIG.usernamePlaceholder;
-  document.getElementById("usernameInputTyping").placeholder = CONFIG.usernamePlaceholder;
-})();
+  if (state === "authenticating" || state === "success") {
+    setOverlayMessage(loginStatus, currentStatus);
+    loginScreen.classList.add("visible");
+    lockScreen.classList.remove("visible");
+    return;
+  }
 
-// ── Login interaction ──
-const usernameInput  = document.getElementById("usernameInput");
-const usernameTyping = document.getElementById("usernameInputTyping");
-const stateDefault   = document.getElementById("stateDefault");
-const stateTyping    = document.getElementById("stateTyping");
-const passwordInput  = document.getElementById("passwordInput");
-const submitBtn      = document.getElementById("submitBtn");
-const loginScreen    = document.getElementById("loginScreen");
-const lockScreen     = document.getElementById("lockScreen");
-const loginStatus    = document.getElementById("loginStatus");
-const lockStatus     = document.getElementById("lockStatus");
-let transitioned = false;
+  if (state === "failed") {
+    loginInFlight = false;
+    loginScreen.classList.remove("visible");
+    lockScreen.classList.remove("visible");
+    const error = String(currentStatus.message || "Authentication failed.").trim();
+    submitBtn.style.background = "#8b1a22";
+    submitBtn.textContent = error.length > 34 ? "Authentication failed" : error;
+    submitBtn.disabled = false;
+    passwordInput.focus();
+    setTimeout(() => {
+      submitBtn.style.background = currentTheme.colorSubmitBtn;
+      submitBtn.textContent = "Log In";
+    }, 1800);
+  }
+}
+
+async function postJson(path, payload) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+    cache: "no-store",
+  });
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_) {
+    data = {};
+  }
+  if (!response.ok || data?.success === false) {
+    throw new Error(String(data?.message || `Request failed (${response.status})`));
+  }
+  return data;
+}
+
+async function getJson(path) {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json();
+}
+
+async function handleLogin() {
+  if (loginInFlight) return;
+  const username = usernameTyping.value.trim();
+  const password = passwordInput.value;
+  if (!username || !password) {
+    submitBtn.style.background = "#8b1a22";
+    submitBtn.textContent = "Enter credentials";
+    setTimeout(() => {
+      submitBtn.style.background = currentTheme.colorSubmitBtn;
+      submitBtn.textContent = "Log In";
+    }, 1600);
+    return;
+  }
+
+  loginInFlight = true;
+  submitBtn.disabled = true;
+  loginStatus.textContent = "Authenticating user...";
+  loginScreen.classList.add("visible");
+
+  if (!isLive) {
+    setTimeout(() => {
+      loginInFlight = false;
+      submitBtn.disabled = false;
+      applyStatus({ state: "ready", workstation: currentStatus.workstation || CONFIG.stationID || "" });
+    }, 900);
+    return;
+  }
+
+  try {
+    await postJson("/login", { username, password });
+  } catch (error) {
+    loginInFlight = false;
+    loginScreen.classList.remove("visible");
+    submitBtn.disabled = false;
+    submitBtn.style.background = "#8b1a22";
+    submitBtn.textContent = String(error?.message || "Authentication failed").slice(0, 34);
+    setTimeout(() => {
+      submitBtn.style.background = currentTheme.colorSubmitBtn;
+      submitBtn.textContent = "Log In";
+    }, 1800);
+  }
+}
 
 usernameInput.addEventListener("input", () => {
   if (usernameInput.value.length > 0 && !transitioned) {
@@ -514,45 +715,54 @@ usernameTyping.addEventListener("input", () => {
   }
 });
 
-usernameTyping.addEventListener("keydown", e => { if (e.key === "Enter") passwordInput.focus(); });
-passwordInput.addEventListener("keydown",  e => { if (e.key === "Enter") handleLogin(); });
+usernameTyping.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") passwordInput.focus();
+});
+passwordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") handleLogin();
+});
 submitBtn.addEventListener("click", handleLogin);
 
-function handleLogin() {
-  const u = usernameTyping.value.trim();
-  const p = passwordInput.value;
-  if (!u || !p) {
-    submitBtn.style.background = "#8b1a22";
-    submitBtn.textContent = "Enter credentials";
-    setTimeout(() => {
-      submitBtn.style.background = CONFIG.colorSubmitBtn;
-      submitBtn.textContent = "Log In";
-    }, 1800);
-    return;
-  }
-  loginStatus.textContent = "Authenticating user...";
-  loginScreen.classList.add("visible");
-  setTimeout(() => { loginStatus.textContent = "Loading workspace..."; }, 2200);
-  setTimeout(() => {
-    loginScreen.classList.remove("visible");
-    setTimeout(() => {
-      usernameTyping.value = ""; passwordInput.value = "";
-      transitioned = false;
-      stateDefault.classList.remove("hidden");
-      stateTyping.classList.remove("active");
-      usernameInput.value = "";
-      submitBtn.textContent = "Log In";
-      submitBtn.disabled = false;
-    }, 400);
-  }, 4800);
-}
-
-document.getElementById("menuBtn").addEventListener("click", () => {
+menuBtn.addEventListener("click", async () => {
   lockStatus.textContent = "Locking workstation...";
   lockScreen.classList.add("visible");
-  setTimeout(() => { lockStatus.textContent = "Logging out..."; }, 2200);
-  setTimeout(() => { lockScreen.classList.remove("visible"); }, 4800);
+
+  if (!isLive) {
+    setTimeout(() => lockScreen.classList.remove("visible"), 1000);
+    return;
+  }
+
+  try {
+    await postJson("/lock", {});
+  } catch (error) {
+    lockScreen.classList.remove("visible");
+  }
 });
+
+window.oneSignShell = {
+  updateTheme(themePayload = {}) {
+    applyTheme(themePayload || {});
+  },
+  applyStatus(statusPayload = {}) {
+    applyStatus(statusPayload || {});
+  },
+};
+
+async function initializeLiveShell() {
+  applyTheme(CONFIG);
+  applyStatus({ state: "ready", workstation: CONFIG.stationID || "" });
+
+  if (!isLive) return;
+  try {
+    const [theme, status] = await Promise.all([getJson("/theme"), getJson("/status")]);
+    applyTheme(theme || {});
+    applyStatus(status || {});
+  } catch (_) {
+    // Keep static preview values when local shell endpoints are unavailable.
+  }
+}
+
+initializeLiveShell();
 </script>
 </body>
 </html>
