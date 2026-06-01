@@ -15,7 +15,7 @@ const CONFIG = {
   menuLogoImage:       "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
   colorRedHex:         "#ff2d55",
   colorNavyHex:        "#0057ff",
-  hexClusterShiftX:    "-2.2vw",
+  hexClusterShiftX:    "0px",
   colorOverlay:        "rgba(0,0,0,0.50)",
   colorSubmitBtn:      "#c9222e",
   stationLabel:        "WORKSTATION:",
@@ -85,10 +85,10 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
    ══════════════════════════════════════════ */
 
 :root {
-  --hex-h: clamp(132px, 13.5vw, 178px); /* height of hex */
+  --hex-h: clamp(152px, 15.8vw, 214px); /* height of hex */
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
   --hex-gap: 0px;
-  --hex-cluster-shift-x: -2.2vw;
+  --hex-cluster-shift-x: 0px;
   --hex-red-color: #c92235;
   --hex-navy-color: #000133;
 }
@@ -131,6 +131,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   justify-content: center;
   gap: clamp(5px,0.6vh,9px);
   z-index: 6;
+  padding: 6% 8%;
 }
 
 .hex-red {
@@ -155,6 +156,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   transform: translate(-50%, -50%);
   z-index: 7;
 }
+.hex-navy-top .hex-label { padding: 0 8%; }
+.hex-navy-bot .hex-label-u { padding: 0 8%; }
 
 /* Content inside hexes */
 .hex .hex-icon svg {
@@ -178,8 +181,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 }
 
 .hex-input, .hex-pass {
-  width: min(70%, 118px);
-  height: clamp(22px,2.4vh,29px);
+  width: min(72%, 136px);
+  height: clamp(24px,2.7vh,33px);
   background: rgba(187,187,187,0.15);
   border: 1px solid rgba(136,136,136,0.25);
   border-radius: 2px;
@@ -195,8 +198,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 }
 
 .hex-submit {
-  width: min(70%, 118px);
-  height: clamp(22px,2.4vh,29px);
+  width: min(72%, 136px);
+  height: clamp(24px,2.7vh,33px);
   background: #c9222e;
   border: none; border-radius: 2px;
   font-family: "Inter Display", sans-serif;
@@ -209,24 +212,25 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 .hex-submit:active { transform: scale(0.97); }
 
 /* Username states */
-.state-default { display:flex; flex-direction:column; align-items:center; gap:0.55vh; width:100%; }
-.state-typing  { display:none; flex-direction:column; align-items:center; gap:0.65vh; width:100%; }
+.state-default { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.6vh; width:100%; }
+.state-typing  { display:none; flex-direction:column; align-items:center; justify-content:center; gap:0.7vh; width:100%; }
 .state-typing.active { display:flex; }
 .state-default.hidden { display:none; }
 
 /* ── Red slab text/logo ── */
 .secure-slab-text {
-  width: 100%;
-  height: 100%;
-  padding: 0 14% 0 8%;
+  width: 82%;
+  height: 88%;
+  padding: 0;
+  margin-left: auto;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  text-align: right;
+  text-align: center;
   gap: clamp(5px, 0.6vh, 10px);
 }
-.secure-slab-text .slab-logo { width: clamp(64px, 7.5vw, 108px); height: auto; display: block; }
+.secure-slab-text .slab-logo { width: clamp(52px, 5.8vw, 88px); height: auto; display: block; }
 .secure-slab-text .secure-title {
   font-family: "Inter Display", sans-serif;
   font-size: clamp(14px,1.6vw,23px);
