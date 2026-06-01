@@ -88,56 +88,71 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
   --hex-gap: 0px;
   --hex-cluster-shift-x: 0px;
+  --hex-red-color: #c92235;
+  --hex-navy-color: #000133;
 }
 
 .hex-cluster {
   position: absolute;
   top: 29.8vh;
   left: calc(-4.3vw + var(--hex-cluster-shift-x));
-  display: grid;
-  grid-template-columns: calc(var(--hex-w) * 0.75) var(--hex-w);
-  grid-template-rows: var(--hex-h) var(--hex-h);
-  column-gap: var(--hex-gap);
-  row-gap: var(--hex-gap);
+  width: calc(var(--hex-h) * 2);
+  height: calc(var(--hex-h) * 2);
   z-index: 4;
 }
 
+.hex-cluster-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+
+.hex-shape {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: url("hexagon.svg") center / 100% 100% no-repeat;
+  mask: url("hexagon.svg") center / 100% 100% no-repeat;
+}
+
+.hex-shape-navy { background: var(--hex-navy-color); }
+.hex-shape-red {
+  background: var(--hex-red-color);
+  clip-path: inset(0 61% 0 0);
+}
+
 .hex {
-  position: relative;
+  position: absolute;
   width:  var(--hex-w);
   height: var(--hex-h);
-  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: clamp(5px,0.6vh,9px);
-  z-index: 5;
+  z-index: 6;
 }
 
 .hex-red {
-  background: #c92235;
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: center;
+  left: 28.8%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   align-items: center;
   justify-content: center;
   padding: 0;
-  z-index: 4;
+  z-index: 6;
   pointer-events: none;
 }
 .hex-navy-top {
-  background: #000133;
-  grid-column: 2;
-  grid-row: 1;
-  z-index: 6;
+  left: 71.7%;
+  top: 25%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
 }
 .hex-navy-bot {
-  background: #000133;
-  grid-column: 2;
-  grid-row: 2;
-  margin-top: clamp(-16px, -1.45vh, -8px);
-  z-index: 6;
+  left: 71.7%;
+  top: 75%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
 }
 
 /* Content inside hexes */
@@ -287,6 +302,10 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   </div>
 
   <div class="hex-cluster">
+    <div class="hex-cluster-bg" aria-hidden="true">
+      <div class="hex-shape hex-shape-navy"></div>
+      <div class="hex-shape hex-shape-red"></div>
+    </div>
     <!-- Red hex (slab effect, partially off-screen left) -->
     <div class="hex hex-red">
       <div class="secure-slab-text">
@@ -365,8 +384,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   const menuLogo = document.getElementById("menuLogoImage");
   if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || CONFIG.logoImage;
 
-  document.querySelector(".hex-red").style.background = CONFIG.colorRedHex;
-  document.querySelectorAll(".hex-navy-top, .hex-navy-bot").forEach(el => el.style.background = CONFIG.colorNavyHex);
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--hex-red-color", CONFIG.colorRedHex);
+  rootStyle.setProperty("--hex-navy-color", CONFIG.colorNavyHex);
 
   const ov = document.getElementById("overlayFull");
   ov.style.background = CONFIG.colorOverlay;
