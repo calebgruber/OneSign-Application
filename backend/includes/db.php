@@ -34,6 +34,19 @@ function getAgentUiSettings(): array {
     ];
 }
 
+function getAgentRuntimeSettings(): array {
+    return [
+        'lock_on_remove'                      => (bool)(int)getSetting('lock_on_remove', '1'),
+        'lock_delay_seconds'                  => (int)getSetting('lock_delay_seconds', '5'),
+        'session_timeout_minutes'             => (int)getSetting('session_timeout_minutes', '480'),
+        'allow_password_fallback'             => (bool)(int)getSetting('allow_password_fallback', '1'),
+        'credential_provider_enabled'         => (bool)(int)getSetting('credential_provider_enabled', '0'),
+        'credential_provider_command'         => getSetting('credential_provider_command', ''),
+        'credential_provider_timeout_seconds' => (int)getSetting('credential_provider_timeout_seconds', '20'),
+        'ui'                                  => getAgentUiSettings(),
+    ];
+}
+
 function logAudit(string $eventType, ?int $userId, ?string $cardId,
                   ?string $workstation, ?string $ip, ?string $details,
                   bool $success = true): void {

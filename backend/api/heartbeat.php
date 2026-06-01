@@ -46,9 +46,5 @@ if ($requestedAt !== null) {
 jsonResponse([
     'ok' => true,
     'ping_requested' => $pingRequested,
-    'settings' => [
-        'allow_password_fallback' => (bool)(int)getSetting('allow_password_fallback', '1'),
-        'session_timeout_minutes' => (int)getSetting('session_timeout_minutes', '480'),
-        'ui' => getAgentUiSettings(),
-    ],
+    'settings' => getAgentRuntimeSettings(),
 ]);

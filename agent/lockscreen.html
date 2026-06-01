@@ -35,6 +35,11 @@ const CONFIG = {
 html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-font-smoothing:antialiased; }
 
 #main { position:relative; width:100vw; height:100vh; overflow:hidden; }
+body, img { -webkit-user-drag: none; user-select: none; }
+body.password-fallback-disabled #stateDefault,
+body.password-fallback-disabled #stateTyping {
+  display: none !important;
+}
 
 /* ── Background ── */
 .bg-img {
@@ -72,6 +77,36 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   letter-spacing:0.07em; text-align:right; line-height:1.5;
 }
 .station-id span { color:rgba(255,255,255,0.6); }
+
+.side-panel-copy {
+  position: absolute;
+  top: 50%;
+  right: 3.8vw;
+  transform: translateY(-50%);
+  width: min(30vw, 420px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(10px, 1.4vh, 18px);
+  color: #fff;
+  text-align: left;
+}
+.side-panel-title {
+  font-family: "Inter Display", sans-serif;
+  font-size: clamp(28px, 3.4vw, 46px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.side-panel-message {
+  font-family: "Inter", sans-serif;
+  font-size: clamp(14px, 1.35vw, 19px);
+  font-weight: 400;
+  line-height: 1.55;
+  color: rgba(255,255,255,0.82);
+  white-space: pre-line;
+}
 
 /* ══════════════════════════════════════════
    HEX SYSTEM
@@ -321,6 +356,11 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
     <span id="stationLabelEl"></span>&nbsp;&nbsp;<span id="stationIDEl"></span>
   </div>
 
+  <div class="side-panel-copy" id="sidePanelCopy">
+    <div class="side-panel-title" id="sidePanelTitle"></div>
+    <div class="side-panel-message" id="sidePanelMessage"></div>
+  </div>
+
   <div class="hex-cluster">
     <svg class="hex-cluster-svg" aria-hidden="true"
          xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -438,6 +478,8 @@ const stationLabelEl = document.getElementById("stationLabelEl");
 const stationIDEl = document.getElementById("stationIDEl");
 const tapBadgeLabelEl = document.getElementById("tapBadgeLabelEl");
 const usernameLabelEl = document.getElementById("usernameLabelEl");
+const sidePanelTitle = document.getElementById("sidePanelTitle");
+const sidePanelMessage = document.getElementById("sidePanelMessage");
 const menuBtn = document.getElementById("menuBtn");
 const menuLogoImage = document.getElementById("menuLogoImage");
 const titleEl = document.querySelector(".secure-title");
@@ -489,6 +531,9 @@ function buildTheme(themePayload = {}) {
 
   const lockPrimary = getThemeValue(themePayload, "lock_color_primary", CONFIG.colorHexLeft || fallbackLeft);
   const lockPanel = getThemeValue(themePayload, "lock_color_panel", CONFIG.colorHexTop || fallbackTop);
+  const allowPasswordFallback = !["", "0", "false", "no", "off"].includes(
+    String(getThemeValue(themePayload, "allow_password_fallback", "1")).trim().toLowerCase(),
+  );
 
   return {
     ...CONFIG,
@@ -516,6 +561,9 @@ function buildTheme(themePayload = {}) {
     usernameLabel: CONFIG.usernameLabel,
     usernamePlaceholder: CONFIG.usernamePlaceholder,
     brandName: getThemeValue(themePayload, "lock_brand_name", "Secure Log In"),
+    rightTitle: getThemeValue(themePayload, "lock_right_title", "OneSign"),
+    rightMessage: getThemeValue(themePayload, "lock_right_message", "Welcome back.\nSingle Sign On is ready when you are."),
+    allowPasswordFallback,
   };
 }
 
@@ -556,6 +604,9 @@ function applyTheme(themePayload = {}) {
   usernameLabelEl.textContent = currentTheme.usernameLabel;
   usernameInput.placeholder = currentTheme.usernamePlaceholder;
   usernameTyping.placeholder = currentTheme.usernamePlaceholder;
+  if (sidePanelTitle) sidePanelTitle.textContent = String(currentTheme.rightTitle || "OneSign").trim() || "OneSign";
+  if (sidePanelMessage) sidePanelMessage.textContent = String(currentTheme.rightMessage || "").trim();
+  document.body.classList.toggle("password-fallback-disabled", !currentTheme.allowPasswordFallback);
 
   if (titleEl) {
     const words = String(currentTheme.brandName || "Secure Log In").trim().split(/\s+/);
@@ -580,6 +631,9 @@ function applyStatus(statusPayload = {}) {
   currentStatus = { ...currentStatus, ...(statusPayload || {}) };
   const state = String(currentStatus.state || "hidden").toLowerCase();
   stationIDEl.textContent = String(currentStatus.workstation || currentTheme.stationID || "");
+  if (sidePanelMessage) {
+    sidePanelMessage.textContent = String(currentStatus.panel_message || currentTheme.rightMessage || "").trim();
+  }
 
   if (state === "hidden") {
     loginScreen.classList.remove("visible");
@@ -599,7 +653,7 @@ function applyStatus(statusPayload = {}) {
     lockScreen.classList.remove("visible");
     loginScreen.classList.remove("visible");
     resetCredentials();
-    usernameInput.focus();
+    if (currentTheme.allowPasswordFallback) usernameInput.focus();
     return;
   }
 
@@ -652,6 +706,7 @@ async function getJson(path) {
 }
 
 async function handleLogin() {
+  if (!currentTheme.allowPasswordFallback) return;
   if (loginInFlight) return;
   const username = usernameTyping.value.trim();
   const password = passwordInput.value;
@@ -695,6 +750,7 @@ async function handleLogin() {
 }
 
 usernameInput.addEventListener("input", () => {
+  if (!currentTheme.allowPasswordFallback) return;
   if (usernameInput.value.length > 0 && !transitioned) {
     transitioned = true;
     usernameTyping.value = usernameInput.value;
@@ -706,6 +762,7 @@ usernameInput.addEventListener("input", () => {
 });
 
 usernameTyping.addEventListener("input", () => {
+  if (!currentTheme.allowPasswordFallback) return;
   if (usernameTyping.value.length === 0) {
     transitioned = false;
     stateDefault.classList.remove("hidden");
@@ -716,9 +773,11 @@ usernameTyping.addEventListener("input", () => {
 });
 
 usernameTyping.addEventListener("keydown", (e) => {
+  if (!currentTheme.allowPasswordFallback) return;
   if (e.key === "Enter") passwordInput.focus();
 });
 passwordInput.addEventListener("keydown", (e) => {
+  if (!currentTheme.allowPasswordFallback) return;
   if (e.key === "Enter") handleLogin();
 });
 submitBtn.addEventListener("click", handleLogin);
@@ -737,6 +796,12 @@ menuBtn.addEventListener("click", async () => {
   } catch (error) {
     lockScreen.classList.remove("visible");
   }
+});
+
+["dragstart", "drop", "contextmenu"].forEach((eventName) => {
+  window.addEventListener(eventName, (event) => {
+    event.preventDefault();
+  });
 });
 
 window.oneSignShell = {

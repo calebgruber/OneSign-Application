@@ -551,6 +551,7 @@ class SessionShell:
             fullscreen=True,
             frameless=True,
             on_top=True,
+            easy_drag=False,
         )
         pump_thread = threading.Thread(target=self._webview_queue_pump, daemon=True, name="OneSign-WebQueue")
         pump_thread.start()

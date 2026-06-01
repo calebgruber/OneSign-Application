@@ -42,6 +42,7 @@ sys.path.insert(0, str(_BASE))
 
 from pcprox    import PcProxReader, PcProxError
 from win_login import (
+    unlock_with_credential_provider,
     unlock_workstation,
     is_workstation_locked,
     validate_windows_credentials,
@@ -221,8 +222,13 @@ class OneSignAgent:
         self._current_version = APP_VERSION
         self._ui_settings = dict(self.config.items("ui")) if self.config.has_section("ui") else {}
         self._runtime_settings: dict[str, Any] = {
+            "lock_on_remove": self.config.getboolean("behavior", "lock_on_remove", fallback=True),
+            "lock_delay_seconds": max(0, self.config.getint("behavior", "lock_delay_seconds", fallback=5)),
             "allow_password_fallback": True,
             "session_timeout_minutes": 0,
+            "credential_provider_enabled": False,
+            "credential_provider_command": "",
+            "credential_provider_timeout_seconds": 20,
         }
         self.session_shell = SessionShell(
             on_lock_requested=self._lock_from_session_shell,
@@ -283,11 +289,27 @@ class OneSignAgent:
         settings = payload.get("settings")
         if not isinstance(settings, dict):
             return
+        if "lock_on_remove" in settings:
+            self._runtime_settings["lock_on_remove"] = bool(settings.get("lock_on_remove"))
+        if "lock_delay_seconds" in settings:
+            try:
+                self._runtime_settings["lock_delay_seconds"] = max(0, int(settings.get("lock_delay_seconds") or 0))
+            except (TypeError, ValueError):
+                pass
         if "allow_password_fallback" in settings:
             self._runtime_settings["allow_password_fallback"] = bool(settings.get("allow_password_fallback"))
         if "session_timeout_minutes" in settings:
             try:
                 self._runtime_settings["session_timeout_minutes"] = max(0, int(settings.get("session_timeout_minutes") or 0))
+            except (TypeError, ValueError):
+                pass
+        if "credential_provider_enabled" in settings:
+            self._runtime_settings["credential_provider_enabled"] = bool(settings.get("credential_provider_enabled"))
+        if "credential_provider_command" in settings:
+            self._runtime_settings["credential_provider_command"] = str(settings.get("credential_provider_command") or "")
+        if "credential_provider_timeout_seconds" in settings:
+            try:
+                self._runtime_settings["credential_provider_timeout_seconds"] = max(1, int(settings.get("credential_provider_timeout_seconds") or 20))
             except (TypeError, ValueError):
                 pass
         ui = settings.get("ui")
@@ -301,9 +323,35 @@ class OneSignAgent:
                 self._ui_settings.update(normalized)
                 self.session_shell.set_theme(self._get_session_shell_theme())
 
+    def _runtime_bool(self, key: str, fallback: bool = False) -> bool:
+        value = self._runtime_settings.get(key, fallback)
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() not in {"", "0", "false", "no", "off"}
+
+    def _runtime_int(self, key: str, fallback: int = 0, *, minimum: int | None = None) -> int:
+        value = self._runtime_settings.get(key, fallback)
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = fallback
+        if minimum is not None:
+            parsed = max(minimum, parsed)
+        return parsed
+
+    def _unlock_windows_session(self, username: str, password: str, domain: str) -> bool:
+        if self._runtime_bool("credential_provider_enabled"):
+            command = str(self._runtime_settings.get("credential_provider_command") or "").strip()
+            if command:
+                timeout_seconds = self._runtime_int("credential_provider_timeout_seconds", 20, minimum=1)
+                return bool(unlock_with_credential_provider(command, username, password, domain, timeout_seconds))
+            logger.warning("Credential provider is enabled but no helper command is configured; falling back to direct unlock")
+        return bool(unlock_workstation(username, password, domain))
+
     def _get_session_shell_theme(self) -> dict[str, str]:
         theme = dict(self._ui_settings)
         theme["lock_server_base_url"] = self.get_server_base_url()
+        theme["allow_password_fallback"] = "1" if self._runtime_bool("allow_password_fallback", True) else "0"
         return theme
 
     def _notify_login_success(self, full_name: str):
@@ -943,7 +991,7 @@ class OneSignAgent:
 
             ok = True
             if is_workstation_locked():
-                ok = unlock_workstation(username, password, domain)
+                ok = self._unlock_windows_session(username, password, domain)
 
             if not ok:
                 self.tray.notify("OneSign — Error", "Login failed. Please use Ctrl+Alt+Del.", duration=6)
@@ -981,7 +1029,7 @@ class OneSignAgent:
         if local_user and validate_windows_credentials(local_user, password, local_domain):
             unlock_ok = True
             if is_workstation_locked():
-                unlock_ok = bool(unlock_workstation(local_user, password, local_domain))
+                unlock_ok = self._unlock_windows_session(local_user, password, local_domain)
             if unlock_ok:
                 display_name = local_user or username
                 self._active_session_card = None
@@ -1034,7 +1082,7 @@ class OneSignAgent:
 
         unlock_ok = True
         if is_workstation_locked():
-            unlock_ok = bool(cred_username and cred_password and unlock_workstation(cred_username, cred_password, domain))
+            unlock_ok = bool(cred_username and cred_password and self._unlock_windows_session(cred_username, cred_password, domain))
         if not unlock_ok:
             self.session_shell.notify_auth_failed("Windows login failed.")
             return
