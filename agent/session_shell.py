@@ -241,9 +241,6 @@ class SessionShell:
                     self.end_headers()
                     self.wfile.write(data)
                     return
-                if path == "/hexagon.svg":
-                    self._serve_asset_file(shell._lockscreen_asset_path().parent / "hexagon.svg")
-                    return
                 if path == "/theme":
                     self._respond_json(shell._build_theme_payload())
                     return
