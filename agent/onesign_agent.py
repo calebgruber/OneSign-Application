@@ -718,6 +718,10 @@ class OneSignAgent:
         self.tray.notify("OneSign Agent", "Starting up…", duration=3)
         self.sync_with_server()
 
+        # Pre-mark the session shell as running so background threads can queue
+        # show_lock() safely before the webview event loop starts.
+        self.session_shell.start()
+
         # Heartbeat thread
         t_hb = threading.Thread(target=self._heartbeat_loop, daemon=True)
         t_hb.start()
@@ -734,9 +738,14 @@ class OneSignAgent:
         t_idle = threading.Thread(target=self._idle_lock_loop, daemon=True)
         t_idle.start()
 
-        # Tray (blocks until exit)
+        # Tray runs in a background thread so the main thread stays free for
+        # the pywebview event loop (which requires the main thread on Windows).
         self.tray.set_status("idle", "OneSign Agent — Ready")
-        self.tray.start()
+        t_tray = threading.Thread(target=self.tray.start, daemon=True, name="OneSign-Tray")
+        t_tray.start()
+
+        # Run the HTML lock-screen webview on the main thread (blocks until exit).
+        self.session_shell.run_on_main_thread()
 
     def stop(self):
         self._running = False
