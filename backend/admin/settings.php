@@ -256,8 +256,9 @@ include __DIR__ . '/../includes/header.php';
                   value="<?= htmlspecialchars($s['lock_brand_name'] ?? 'Secure log in') ?>">
               </div>
               <div class="col-lg-4">
-                <label class="form-label">Right panel title</label>
+                <label class="form-label">Right panel title <small class="text-muted">(leave blank to hide)</small></label>
                 <input type="text" name="lock_right_title" class="form-control"
+                  placeholder="(hidden when empty)"
                   value="<?= htmlspecialchars($s['lock_right_title'] ?? '') ?>">
               </div>
               <div class="col-lg-4">
