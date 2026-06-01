@@ -8,6 +8,8 @@
 <script>
 // ═══════════════════════════════════════════════
 //  CONFIGURATION — change anything here easily
+//  colorHexLeft / colorHexTop / colorHexBottom:
+//    Set the fill color of each hexagon shape.
 // ═══════════════════════════════════════════════
 const CONFIG = {
   backgroundImage:     "https://novumstructures.com/eu/wp-content/uploads/sNovum-CHOP-1253-CNP-scaled.jpeg",
@@ -111,39 +113,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   z-index: 4;
 }
 
-.hex-cluster-bg {
+.hex-cluster-svg {
   position: absolute;
   inset: 0;
-  background: url("hexagon.svg") left center / 100% 100% no-repeat;
+  width: 100%;
+  height: 100%;
   z-index: 4;
   pointer-events: none;
-}
-
-.hex-shape {
-  position: absolute;
-  width: var(--hex-w);
-  height: var(--hex-h);
-  -webkit-mask: url("hexagon.svg") center / 100% 100% no-repeat;
-  mask: url("hexagon.svg") center / 100% 100% no-repeat;
-}
-
-.hex-shape-left {
-  left: 28.8%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--hex-left-color);
-}
-.hex-shape-top {
-  left: 71.7%;
-  top: 25%;
-  transform: translate(-50%, -50%);
-  background: var(--hex-top-color);
-}
-.hex-shape-bottom {
-  left: 71.7%;
-  top: 75%;
-  transform: translate(-50%, -50%);
-  background: var(--hex-bottom-color);
 }
 
 .hex {
@@ -346,7 +322,39 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   </div>
 
   <div class="hex-cluster">
-    <div class="hex-cluster-bg" aria-hidden="true"></div>
+    <svg class="hex-cluster-svg" aria-hidden="true"
+         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+         viewBox="0 0 112.5 112.499997" preserveAspectRatio="none" version="1.0">
+      <defs>
+        <clipPath id="d6bfaa0226"><path d="M 0 31.152344 L 43.289062 31.152344 L 43.289062 80.847656 L 0 80.847656 Z M 0 31.152344 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="d5823111a0"><path d="M 43.265625 56 L 28.808594 80.847656 L -0.101562 80.847656 L -14.558594 56 L -0.101562 31.152344 L 28.808594 31.152344 Z M 43.265625 56 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="bd5f8dccbe"><path d="M 0 0.152344 L 43.289062 0.152344 L 43.289062 49.847656 L 0 49.847656 Z M 0 0.152344 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="16737ce0c3"><path d="M 43.265625 25 L 28.808594 49.847656 L -0.101562 49.847656 L -14.558594 25 L -0.101562 0.152344 L 28.808594 0.152344 Z M 43.265625 25 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="5f1a957636"><rect x="0" width="44" y="0" height="50"/></clipPath>
+        <clipPath id="65e3ebe8e1"><path d="M 30.703125 6.304688 L 88.550781 6.304688 L 88.550781 56 L 30.703125 56 Z M 30.703125 6.304688 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="2d632a6620"><path d="M 88.53125 31.152344 L 74.074219 56 L 45.160156 56 L 30.703125 31.152344 L 45.160156 6.304688 L 74.074219 6.304688 Z M 88.53125 31.152344 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="c715c8df45"><path d="M 0.703125 0.304688 L 58.550781 0.304688 L 58.550781 50 L 0.703125 50 Z M 0.703125 0.304688 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="95da5ac183"><path d="M 58.53125 25.152344 L 44.074219 50 L 15.160156 50 L 0.703125 25.152344 L 15.160156 0.304688 L 44.074219 0.304688 Z M 58.53125 25.152344 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="e5fafe7ce6"><rect x="0" width="59" y="0" height="50"/></clipPath>
+        <clipPath id="7782e6bada"><path d="M 30.703125 56 L 88.550781 56 L 88.550781 105.695312 L 30.703125 105.695312 Z M 30.703125 56 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="30b45ef470"><path d="M 88.53125 80.847656 L 74.074219 105.695312 L 45.160156 105.695312 L 30.703125 80.847656 L 45.160156 56 L 74.074219 56 Z M 88.53125 80.847656 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="8de8e9e306"><path d="M 0.703125 0 L 58.550781 0 L 58.550781 49.695312 L 0.703125 49.695312 Z M 0.703125 0 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="e11cbed176"><path d="M 58.53125 24.847656 L 44.074219 49.695312 L 15.160156 49.695312 L 0.703125 24.847656 L 15.160156 0 L 44.074219 0 Z M 58.53125 24.847656 " clip-rule="nonzero"/></clipPath>
+        <clipPath id="b48ebaf76f"><rect x="0" width="59" y="0" height="50"/></clipPath>
+      </defs>
+      <!-- Left hexagon -->
+      <g clip-path="url(#d6bfaa0226)"><g clip-path="url(#d5823111a0)"><g transform="matrix(1, 0, 0, 1, 0, 31)"><g clip-path="url(#5f1a957636)"><g clip-path="url(#bd5f8dccbe)"><g clip-path="url(#16737ce0c3)">
+        <path id="hexSvgLeft" fill="#ffffff" d="M -14.558594 0.152344 L 43.289062 0.152344 L 43.289062 49.847656 L -14.558594 49.847656 Z M -14.558594 0.152344 " fill-opacity="1" fill-rule="nonzero"/>
+      </g></g></g></g></g></g>
+      <!-- Top hexagon -->
+      <g clip-path="url(#65e3ebe8e1)"><g clip-path="url(#2d632a6620)"><g transform="matrix(1, 0, 0, 1, 30, 6)"><g clip-path="url(#e5fafe7ce6)"><g clip-path="url(#c715c8df45)"><g clip-path="url(#95da5ac183)">
+        <path id="hexSvgTop" fill="#ffffff" d="M 0.703125 0.304688 L 58.550781 0.304688 L 58.550781 50 L 0.703125 50 Z M 0.703125 0.304688 " fill-opacity="1" fill-rule="nonzero"/>
+      </g></g></g></g></g></g>
+      <!-- Bottom hexagon -->
+      <g clip-path="url(#7782e6bada)"><g clip-path="url(#30b45ef470)"><g transform="matrix(1, 0, 0, 1, 30, 56)"><g clip-path="url(#b48ebaf76f)"><g clip-path="url(#8de8e9e306)"><g clip-path="url(#e11cbed176)">
+        <path id="hexSvgBottom" fill="#ffffff" d="M 0.703125 0 L 58.550781 0 L 58.550781 49.695312 L 0.703125 49.695312 Z M 0.703125 0 " fill-opacity="1" fill-rule="nonzero"/>
+      </g></g></g></g></g></g>
+    </svg>
     <!-- Red hex (slab effect, partially off-screen left) -->
     <div class="hex hex-red">
       <div class="secure-slab-text">
@@ -445,6 +453,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   rootStyle.setProperty("--hex-left-color", leftColor);
   rootStyle.setProperty("--hex-top-color", topColor);
   rootStyle.setProperty("--hex-bottom-color", bottomColor);
+
+  const hexSvgLeft   = document.getElementById("hexSvgLeft");
+  const hexSvgTop    = document.getElementById("hexSvgTop");
+  const hexSvgBottom = document.getElementById("hexSvgBottom");
+  if (hexSvgLeft)   hexSvgLeft.setAttribute("fill", leftColor);
+  if (hexSvgTop)    hexSvgTop.setAttribute("fill", topColor);
+  if (hexSvgBottom) hexSvgBottom.setAttribute("fill", bottomColor);
 
   const clusterShift = String(CONFIG.hexClusterShiftX ?? "").trim();
   if (clusterShift) {
