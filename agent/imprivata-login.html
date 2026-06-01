@@ -13,6 +13,9 @@ const CONFIG = {
   backgroundImage:     "https://novumstructures.com/eu/wp-content/uploads/sNovum-CHOP-1253-CNP-scaled.jpeg",
   logoImage:           "https://www.designveloper.com/wp-content/uploads/2024/06/Imprivata-1.png",
   menuLogoImage:       "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
+  colorHexLeft:        "#ff2d55",
+  colorHexTop:         "#0057ff",
+  colorHexBottom:      "#0057ff",
   colorRedHex:         "#ff2d55",
   colorNavyHex:        "#0057ff",
   hexClusterShiftX:    "3",
@@ -89,8 +92,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
   --hex-gap: 0px;
   --hex-cluster-shift-x: 0px;
-  --hex-red-color: #c92235;
-  --hex-navy-color: #000133;
+  --hex-left-color: #c92235;
+  --hex-top-color: #000133;
+  --hex-bottom-color: #000133;
 }
 
 .hex-cluster {
@@ -110,15 +114,29 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
 .hex-shape {
   position: absolute;
-  inset: 0;
+  width: var(--hex-w);
+  height: var(--hex-h);
   -webkit-mask: url("hexagon.svg") center / 100% 100% no-repeat;
   mask: url("hexagon.svg") center / 100% 100% no-repeat;
 }
 
-.hex-shape-navy { background: var(--hex-navy-color); }
-.hex-shape-red {
-  background: var(--hex-red-color);
-  clip-path: inset(0 61% 0 0);
+.hex-shape-left {
+  left: 28.8%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--hex-left-color);
+}
+.hex-shape-top {
+  left: 71.7%;
+  top: 25%;
+  transform: translate(-50%, -50%);
+  background: var(--hex-top-color);
+}
+.hex-shape-bottom {
+  left: 71.7%;
+  top: 75%;
+  transform: translate(-50%, -50%);
+  background: var(--hex-bottom-color);
 }
 
 .hex {
@@ -131,7 +149,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   justify-content: center;
   gap: clamp(5px,0.6vh,9px);
   z-index: 6;
-  padding: 6% 8%;
+  padding: 0;
+  text-align: center;
+  overflow: hidden;
 }
 
 .hex-red {
@@ -159,6 +179,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 .hex-navy-top .hex-label { padding: 0 8%; }
 .hex-navy-bot .hex-label-u { padding: 0 8%; }
 
+.hex-icon {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Content inside hexes */
 .hex .hex-icon svg {
   width:  clamp(28px, 2.8vw, 44px);
@@ -170,18 +197,20 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   font-size: clamp(13px, 1.35vw, 19px);
   font-weight: 700; color: #fff;
   text-align: center; line-height: 1.15;
-  padding: 0 14%;
+  width: 100%;
+  padding: 0 10%;
 }
 .hex .hex-label-u {
   font-family: "Inter", sans-serif;
   font-size: clamp(9px, 0.85vw, 11.5px);
   font-weight: 500; color: #fff;
   text-align: center; letter-spacing: 0.01em;
-  line-height: 1.3; padding: 0 12%;
+  width: 100%;
+  line-height: 1.3; padding: 0 10%;
 }
 
 .hex-input, .hex-pass {
-  width: min(72%, 136px);
+  width: min(74%, 136px);
   height: clamp(24px,2.7vh,33px);
   background: rgba(187,187,187,0.15);
   border: 1px solid rgba(136,136,136,0.25);
@@ -219,10 +248,10 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
 /* ── Red slab text/logo ── */
 .secure-slab-text {
-  width: 82%;
+  width: 74%;
   height: 88%;
   padding: 0;
-  margin-left: auto;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -308,8 +337,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
   <div class="hex-cluster">
     <div class="hex-cluster-bg" aria-hidden="true">
-      <div class="hex-shape hex-shape-navy"></div>
-      <div class="hex-shape hex-shape-red"></div>
+      <div class="hex-shape hex-shape-left"></div>
+      <div class="hex-shape hex-shape-top"></div>
+      <div class="hex-shape hex-shape-bottom"></div>
     </div>
     <!-- Red hex (slab effect, partially off-screen left) -->
     <div class="hex hex-red">
@@ -400,12 +430,15 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   const rootEl = document.documentElement;
   const rootStyle = rootEl.style;
   const computedStyle = getComputedStyle(rootEl);
-  const redFallback = computedStyle.getPropertyValue("--hex-red-color").trim() || "#c92235";
-  const navyFallback = computedStyle.getPropertyValue("--hex-navy-color").trim() || "#000133";
-  const redColor = normalizeColor(CONFIG.colorRedHex, redFallback);
-  const navyColor = normalizeColor(CONFIG.colorNavyHex, navyFallback);
-  rootStyle.setProperty("--hex-red-color", redColor);
-  rootStyle.setProperty("--hex-navy-color", navyColor);
+  const leftFallback = computedStyle.getPropertyValue("--hex-left-color").trim() || "#c92235";
+  const topFallback = computedStyle.getPropertyValue("--hex-top-color").trim() || "#000133";
+  const bottomFallback = computedStyle.getPropertyValue("--hex-bottom-color").trim() || "#000133";
+  const leftColor = normalizeColor(CONFIG.colorHexLeft ?? CONFIG.colorRedHex, leftFallback);
+  const topColor = normalizeColor(CONFIG.colorHexTop ?? CONFIG.colorNavyHex, topFallback);
+  const bottomColor = normalizeColor(CONFIG.colorHexBottom ?? CONFIG.colorNavyHex, bottomFallback);
+  rootStyle.setProperty("--hex-left-color", leftColor);
+  rootStyle.setProperty("--hex-top-color", topColor);
+  rootStyle.setProperty("--hex-bottom-color", bottomColor);
 
   const clusterShift = String(CONFIG.hexClusterShiftX ?? "").trim();
   if (clusterShift) {
