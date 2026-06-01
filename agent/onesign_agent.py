@@ -793,27 +793,6 @@ class OneSignAgent:
                             self._reader_reconnect_requested = False
                             break
                     time.sleep(interval)
-
-    def _idle_lock_loop(self):
-        while self._running:
-                    try:
-                        timeout_minutes = int(self._runtime_settings.get("session_timeout_minutes") or 0)
-                        if timeout_minutes <= 0:
-                            time.sleep(5)
-                            continue
-                        if is_workstation_locked() or self.session_shell.is_visible():
-                            time.sleep(5)
-                            continue
-                        idle_seconds = get_idle_seconds()
-                        if idle_seconds >= (timeout_minutes * 60):
-                            logger.info("Auto-locking workstation after %.1f minutes of inactivity", timeout_minutes)
-                            self._active_session_card = None
-                            self.tray.set_status("locked", "OneSign — Auto-locked for inactivity")
-                            self.session_shell.show_lock(HOSTNAME)
-                            time.sleep(2)
-                    except Exception as exc:
-                        logger.debug("Idle lock loop error: %s", exc)
-                    time.sleep(5)
                     continue
                 logger.info("Card detected: %s", card_hex)
                 self._last_card_hex      = card_hex
@@ -856,6 +835,27 @@ class OneSignAgent:
                     break
 
             time.sleep(interval)
+
+    def _idle_lock_loop(self):
+        while self._running:
+            try:
+                timeout_minutes = int(self._runtime_settings.get("session_timeout_minutes") or 0)
+                if timeout_minutes <= 0:
+                    time.sleep(5)
+                    continue
+                if is_workstation_locked() or self.session_shell.is_visible():
+                    time.sleep(5)
+                    continue
+                idle_seconds = get_idle_seconds()
+                if idle_seconds >= (timeout_minutes * 60):
+                    logger.info("Auto-locking workstation after %.1f minutes of inactivity", timeout_minutes)
+                    self._active_session_card = None
+                    self.tray.set_status("locked", "OneSign — Auto-locked for inactivity")
+                    self.session_shell.show_lock(HOSTNAME)
+                    time.sleep(2)
+            except Exception as exc:
+                logger.debug("Idle lock loop error: %s", exc)
+            time.sleep(5)
 
     def _refresh_enrollment_mode(self, now: float | None = None):
         now = now if now is not None else time.monotonic()
