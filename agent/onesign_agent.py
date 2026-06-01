@@ -125,6 +125,11 @@ DEFAULT_CONFIG = {
         "lock_color_panel": "#1D2A43",
         "lock_color_hex": "#F4F6FA",
         "lock_color_text": "#FFFFFF",
+        "lock_color_hex_left": "",
+        "lock_color_hex_top": "",
+        "lock_color_hex_bottom": "",
+        "lock_color_overlay": "rgba(0,0,0,0.50)",
+        "lock_color_submit": "#c9222e",
     },
     "updates": {
         "enabled": "true",

@@ -421,137 +421,255 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 </div>
 
 <script>
-(function applyConfig() {
-  const normalizeColor = (value, fallback) => {
-    const raw = String(value ?? "").trim();
-    if (!raw) return fallback;
-    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return raw;
-    if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return `#${raw}`;
-    return raw;
-  };
+// ── Backend integration ──────────────────────────────────────────────────
+// When loaded by the agent (127.0.0.1), fetches /theme and /status on page
+// load and exposes window.oneSignShell so Python can push live updates via
+// evaluate_js(). Falls back to static CONFIG values when opened as a file.
+const isLive = location.hostname === '127.0.0.1';
 
-  const bgEl = document.querySelector(".bg-img");
-  if (CONFIG.backgroundImage) bgEl.src = CONFIG.backgroundImage;
-
-  const logoIds = ["logoTopImage", "slabLogoImage", "tsLogoImage", "lsLogoImage"];
-  logoIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.src = CONFIG.logoImage;
-  });
-  const menuLogo = document.getElementById("menuLogoImage");
-  if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || CONFIG.logoImage;
-
-  const rootEl = document.documentElement;
-  const rootStyle = rootEl.style;
-  const computedStyle = getComputedStyle(rootEl);
-  const leftFallback = computedStyle.getPropertyValue("--hex-left-color").trim() || "#c92235";
-  const topFallback = computedStyle.getPropertyValue("--hex-top-color").trim() || "#000133";
-  const bottomFallback = computedStyle.getPropertyValue("--hex-bottom-color").trim() || "#000133";
-  const leftColor = normalizeColor(CONFIG.colorHexLeft ?? CONFIG.colorRedHex, leftFallback);
-  const topColor = normalizeColor(CONFIG.colorHexTop ?? CONFIG.colorNavyHex, topFallback);
-  const bottomColor = normalizeColor(CONFIG.colorHexBottom ?? CONFIG.colorNavyHex, bottomFallback);
-  rootStyle.setProperty("--hex-left-color", leftColor);
-  rootStyle.setProperty("--hex-top-color", topColor);
-  rootStyle.setProperty("--hex-bottom-color", bottomColor);
-
-  const hexSvgLeft   = document.getElementById("hexSvgLeft");
-  const hexSvgTop    = document.getElementById("hexSvgTop");
-  const hexSvgBottom = document.getElementById("hexSvgBottom");
-  if (hexSvgLeft)   hexSvgLeft.setAttribute("fill", leftColor);
-  if (hexSvgTop)    hexSvgTop.setAttribute("fill", topColor);
-  if (hexSvgBottom) hexSvgBottom.setAttribute("fill", bottomColor);
-
-  const clusterShift = String(CONFIG.hexClusterShiftX ?? "").trim();
-  if (clusterShift) {
-    rootStyle.setProperty("--hex-cluster-shift-x", clusterShift);
-  }
-
-  const ov = document.getElementById("overlayFull");
-  ov.style.background = CONFIG.colorOverlay;
-  ov.style.opacity = "1";
-
-  document.getElementById("submitBtn").style.background = normalizeColor(CONFIG.colorSubmitBtn, "#c9222e");
-
-  document.getElementById("stationLabelEl").textContent  = CONFIG.stationLabel;
-  document.getElementById("stationIDEl").textContent     = CONFIG.stationID;
-  document.getElementById("tapBadgeLabelEl").textContent  = CONFIG.tapBadgeLabel;
-  document.getElementById("usernameLabelEl").textContent  = CONFIG.usernameLabel;
-  document.getElementById("usernameInput").placeholder    = CONFIG.usernamePlaceholder;
-  document.getElementById("usernameInputTyping").placeholder = CONFIG.usernamePlaceholder;
-})();
-
-// ── Login interaction ──
-const usernameInput  = document.getElementById("usernameInput");
-const usernameTyping = document.getElementById("usernameInputTyping");
-const stateDefault   = document.getElementById("stateDefault");
-const stateTyping    = document.getElementById("stateTyping");
-const passwordInput  = document.getElementById("passwordInput");
-const submitBtn      = document.getElementById("submitBtn");
-const loginScreen    = document.getElementById("loginScreen");
-const lockScreen     = document.getElementById("lockScreen");
-const loginStatus    = document.getElementById("loginStatus");
-const lockStatus     = document.getElementById("lockStatus");
+const bgEl          = document.querySelector('.bg-img');
+const usernameInput  = document.getElementById('usernameInput');
+const usernameTyping = document.getElementById('usernameInputTyping');
+const stateDefault   = document.getElementById('stateDefault');
+const stateTyping    = document.getElementById('stateTyping');
+const passwordInput  = document.getElementById('passwordInput');
+const submitBtn      = document.getElementById('submitBtn');
+const loginScreen    = document.getElementById('loginScreen');
+const lockScreen     = document.getElementById('lockScreen');
+const loginStatus    = document.getElementById('loginStatus');
+const lockStatus     = document.getElementById('lockStatus');
 let transitioned = false;
+let _submitColor = CONFIG.colorSubmitBtn;
 
-usernameInput.addEventListener("input", () => {
+const _normalizeColor = (value, fallback) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return raw;
+  if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return `#${raw}`;
+  return raw;
+};
+
+// ── applyTheme: maps backend theme payload + CONFIG onto the page ─────────
+function applyTheme(theme) {
+  const t = theme || {};
+  const get = (key) => String(t[key] ?? '').trim();
+
+  // Background image
+  const bgSrc = get('lock_background_image') || CONFIG.backgroundImage;
+  if (bgSrc && bgEl) bgEl.src = bgSrc;
+
+  // Logo images
+  const logoSrc = get('lock_logo_image') || CONFIG.logoImage;
+  ['logoTopImage', 'slabLogoImage', 'tsLogoImage', 'lsLogoImage'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && logoSrc) el.src = logoSrc;
+  });
+  const menuLogo = document.getElementById('menuLogoImage');
+  if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || logoSrc;
+
+  // Hex colors: per-hex theme key > primary/panel theme key > CONFIG defaults
+  const root = document.documentElement;
+  const cs   = getComputedStyle(root);
+  const leftFallback   = cs.getPropertyValue('--hex-left-color').trim()   || '#c92235';
+  const topFallback    = cs.getPropertyValue('--hex-top-color').trim()    || '#000133';
+  const bottomFallback = cs.getPropertyValue('--hex-bottom-color').trim() || '#000133';
+
+  const leftColor   = _normalizeColor(
+    get('lock_color_hex_left')   || get('lock_color_primary') || CONFIG.colorHexLeft   || CONFIG.colorRedHex,
+    leftFallback);
+  const topColor    = _normalizeColor(
+    get('lock_color_hex_top')    || get('lock_color_panel')   || CONFIG.colorHexTop    || CONFIG.colorNavyHex,
+    topFallback);
+  const bottomColor = _normalizeColor(
+    get('lock_color_hex_bottom') || get('lock_color_panel')   || CONFIG.colorHexBottom || CONFIG.colorNavyHex,
+    bottomFallback);
+
+  root.style.setProperty('--hex-left-color',   leftColor);
+  root.style.setProperty('--hex-top-color',    topColor);
+  root.style.setProperty('--hex-bottom-color', bottomColor);
+
+  const hexSvgLeft   = document.getElementById('hexSvgLeft');
+  const hexSvgTop    = document.getElementById('hexSvgTop');
+  const hexSvgBottom = document.getElementById('hexSvgBottom');
+  if (hexSvgLeft)   hexSvgLeft.setAttribute('fill',   leftColor);
+  if (hexSvgTop)    hexSvgTop.setAttribute('fill',    topColor);
+  if (hexSvgBottom) hexSvgBottom.setAttribute('fill', bottomColor);
+
+  // Cluster shift
+  const shift = String(CONFIG.hexClusterShiftX ?? '').trim();
+  if (shift) root.style.setProperty('--hex-cluster-shift-x', shift);
+
+  // Overlay
+  const overlay = get('lock_color_overlay') || CONFIG.colorOverlay;
+  const ov = document.getElementById('overlayFull');
+  if (ov) { ov.style.background = overlay; ov.style.opacity = '1'; }
+
+  // Submit button color
+  _submitColor = _normalizeColor(
+    get('lock_color_submit') || get('lock_color_alert') || CONFIG.colorSubmitBtn,
+    '#c9222e');
+  if (submitBtn) submitBtn.style.background = _submitColor;
+
+  // Text labels (driven by CONFIG)
+  document.getElementById('stationLabelEl').textContent  = CONFIG.stationLabel;
+  document.getElementById('tapBadgeLabelEl').textContent  = CONFIG.tapBadgeLabel;
+  document.getElementById('usernameLabelEl').textContent  = CONFIG.usernameLabel;
+  usernameInput.placeholder    = CONFIG.usernamePlaceholder;
+  usernameTyping.placeholder   = CONFIG.usernamePlaceholder;
+}
+
+// ── applyStatus: reflects Python-pushed lock/auth states onto the UI ──────
+function applyStatus(status) {
+  const s         = status || {};
+  const state     = s.state || 'ready';
+  const wks       = s.workstation || CONFIG.stationID;
+  const message   = String(s.message || '').trim();
+  const title     = String(s.title   || '').trim();
+
+  const stationIDEl = document.getElementById('stationIDEl');
+  if (stationIDEl) stationIDEl.textContent = wks;
+
+  if (state === 'locking') {
+    lockStatus.textContent = 'Locking workstation...';
+    lockScreen.classList.add('visible');
+    loginScreen.classList.remove('visible');
+    _resetForm();
+  } else if (state === 'authenticating') {
+    loginStatus.textContent = message || 'Authenticating user...';
+    loginScreen.classList.add('visible');
+    lockScreen.classList.remove('visible');
+    _setFormEnabled(false);
+  } else if (state === 'success') {
+    loginStatus.textContent = title || message || 'Unlocking...';
+    loginScreen.classList.add('visible');
+    lockScreen.classList.remove('visible');
+    _setFormEnabled(false);
+  } else if (state === 'failed') {
+    loginScreen.classList.remove('visible');
+    lockScreen.classList.remove('visible');
+    _setFormEnabled(true);
+    if (submitBtn) {
+      submitBtn.style.background = '#8b1a22';
+      submitBtn.textContent = message || 'Authentication failed';
+      setTimeout(() => {
+        submitBtn.style.background = _submitColor;
+        submitBtn.textContent = 'Log In';
+      }, 2500);
+    }
+    if (passwordInput) { passwordInput.value = ''; passwordInput.focus(); }
+  } else {
+    // ready / hidden / unknown — restore normal interactive state
+    lockScreen.classList.remove('visible');
+    loginScreen.classList.remove('visible');
+    _resetForm();
+  }
+}
+
+function _resetForm() {
+  transitioned = false;
+  stateDefault.classList.remove('hidden');
+  stateTyping.classList.remove('active');
+  if (usernameInput)  usernameInput.value  = '';
+  if (usernameTyping) usernameTyping.value = '';
+  if (passwordInput)  passwordInput.value  = '';
+  if (submitBtn) { submitBtn.textContent = 'Log In'; submitBtn.disabled = false; }
+  _setFormEnabled(true);
+}
+
+function _setFormEnabled(enabled) {
+  [usernameInput, usernameTyping, passwordInput, submitBtn].forEach(el => {
+    if (el) el.disabled = !enabled;
+  });
+}
+
+// Expose shell API so Python can inject: window.oneSignShell?.updateTheme(...)
+window.oneSignShell = {
+  updateTheme: (theme)  => applyTheme(theme),
+  applyStatus: (status) => applyStatus(status),
+};
+
+// ── Initial load: apply CONFIG defaults, then fetch live theme + status ────
+applyTheme({});
+if (isLive) {
+  fetch('/theme').then(r => r.json()).then(applyTheme).catch(() => {});
+  fetch('/status').then(r => r.json()).then(applyStatus).catch(() => {});
+}
+
+// ── Login interaction ─────────────────────────────────────────────────────
+usernameInput.addEventListener('input', () => {
   if (usernameInput.value.length > 0 && !transitioned) {
     transitioned = true;
     usernameTyping.value = usernameInput.value;
-    stateDefault.classList.add("hidden");
-    stateTyping.classList.add("active");
+    stateDefault.classList.add('hidden');
+    stateTyping.classList.add('active');
     usernameTyping.focus();
     usernameTyping.setSelectionRange(usernameTyping.value.length, usernameTyping.value.length);
   }
 });
 
-usernameTyping.addEventListener("input", () => {
+usernameTyping.addEventListener('input', () => {
   if (usernameTyping.value.length === 0) {
     transitioned = false;
-    stateDefault.classList.remove("hidden");
-    stateTyping.classList.remove("active");
-    usernameInput.value = "";
+    stateDefault.classList.remove('hidden');
+    stateTyping.classList.remove('active');
+    usernameInput.value = '';
     usernameInput.focus();
   }
 });
 
-usernameTyping.addEventListener("keydown", e => { if (e.key === "Enter") passwordInput.focus(); });
-passwordInput.addEventListener("keydown",  e => { if (e.key === "Enter") handleLogin(); });
-submitBtn.addEventListener("click", handleLogin);
+usernameTyping.addEventListener('keydown', e => { if (e.key === 'Enter') passwordInput.focus(); });
+passwordInput.addEventListener('keydown',  e => { if (e.key === 'Enter') handleLogin(); });
+submitBtn.addEventListener('click', handleLogin);
 
 function handleLogin() {
   const u = usernameTyping.value.trim();
   const p = passwordInput.value;
   if (!u || !p) {
-    submitBtn.style.background = "#8b1a22";
-    submitBtn.textContent = "Enter credentials";
-    setTimeout(() => {
-      submitBtn.style.background = CONFIG.colorSubmitBtn;
-      submitBtn.textContent = "Log In";
-    }, 1800);
+    if (submitBtn) {
+      submitBtn.style.background = '#8b1a22';
+      submitBtn.textContent = 'Enter credentials';
+      setTimeout(() => {
+        submitBtn.style.background = _submitColor;
+        submitBtn.textContent = 'Log In';
+      }, 1800);
+    }
     return;
   }
-  loginStatus.textContent = "Authenticating user...";
-  loginScreen.classList.add("visible");
-  setTimeout(() => { loginStatus.textContent = "Loading workspace..."; }, 2200);
-  setTimeout(() => {
-    loginScreen.classList.remove("visible");
+  loginStatus.textContent = 'Authenticating user...';
+  loginScreen.classList.add('visible');
+  _setFormEnabled(false);
+
+  if (isLive) {
+    fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p }),
+    }).catch(() => {
+      // Network error: re-enable form so the user can retry
+      loginScreen.classList.remove('visible');
+      _setFormEnabled(true);
+    });
+    // Auth result arrives via window.oneSignShell.applyStatus() from Python
+  } else {
+    // Demo/preview mode: simulate a successful login
+    setTimeout(() => { loginStatus.textContent = 'Loading workspace...'; }, 2200);
     setTimeout(() => {
-      usernameTyping.value = ""; passwordInput.value = "";
-      transitioned = false;
-      stateDefault.classList.remove("hidden");
-      stateTyping.classList.remove("active");
-      usernameInput.value = "";
-      submitBtn.textContent = "Log In";
-      submitBtn.disabled = false;
-    }, 400);
-  }, 4800);
+      loginScreen.classList.remove('visible');
+      _resetForm();
+    }, 4800);
+  }
 }
 
-document.getElementById("menuBtn").addEventListener("click", () => {
-  lockStatus.textContent = "Locking workstation...";
-  lockScreen.classList.add("visible");
-  setTimeout(() => { lockStatus.textContent = "Logging out..."; }, 2200);
-  setTimeout(() => { lockScreen.classList.remove("visible"); }, 4800);
+document.getElementById('menuBtn').addEventListener('click', () => {
+  if (isLive) {
+    fetch('/lock', { method: 'POST' }).catch(() => {});
+  } else {
+    // Demo/preview mode
+    lockStatus.textContent = 'Locking workstation...';
+    lockScreen.classList.add('visible');
+    setTimeout(() => { lockStatus.textContent = 'Logging out...'; }, 2200);
+    setTimeout(() => { lockScreen.classList.remove('visible'); }, 4800);
+  }
 });
 </script>
 </body>

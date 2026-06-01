@@ -58,6 +58,11 @@ class SessionShell:
             "lock_color_alert": "#E53935",
             "lock_color_info": "#4A9EFF",
             "lock_color_success": "#4CAF50",
+            "lock_color_hex_left": "",
+            "lock_color_hex_top": "",
+            "lock_color_hex_bottom": "",
+            "lock_color_overlay": "rgba(0,0,0,0.50)",
+            "lock_color_submit": "#c9222e",
             "lock_right_title": "OneSign",
             "lock_right_message": "Welcome back.\nSingle Sign On is ready when you are.",
         }
