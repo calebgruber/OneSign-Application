@@ -58,6 +58,9 @@ class SessionShell:
             "lock_color_alert": "#E53935",
             "lock_color_info": "#4A9EFF",
             "lock_color_success": "#4CAF50",
+            # Per-hex fill colors for the lock-screen hex cluster.
+            # When empty the HTML falls back to lock_color_primary (left hex)
+            # or lock_color_panel (top/bottom hexes).
             "lock_color_hex_left": "",
             "lock_color_hex_top": "",
             "lock_color_hex_bottom": "",
