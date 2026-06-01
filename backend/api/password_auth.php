@@ -44,7 +44,7 @@ if (
     $emergencyUsername !== '' &&
     $emergencyPassword !== '' &&
     strcasecmp($username, $emergencyUsername) === 0 &&
-    hash_equals($emergencyPassword, $password)
+    hash_equals($password, $emergencyPassword)
 ) {
     $stmt = db()->prepare('
         SELECT id, username, full_name, email, department, windows_domain, active
@@ -87,7 +87,7 @@ if ($authRow === null) {
     if (!empty($authRow['windows_password_enc'])) {
         $storedPassword = (string)(decryptCredential($authRow['windows_password_enc']) ?? '');
     }
-    if ($storedPassword === '' || !hash_equals($storedPassword, $password)) {
+    if ($storedPassword === '' || !hash_equals($password, $storedPassword)) {
         logAudit('password_auth_failed', (int)$authRow['id'], null, $workstation, getClientIp(), 'Invalid password', false);
         jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
     }

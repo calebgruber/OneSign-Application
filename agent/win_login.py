@@ -221,7 +221,6 @@ def unlock_workstation(username: str, password: str, domain: str = '.') -> bool:
             return False
 
         # 2. Switch our thread to the Winlogon desktop
-        h_old = ctypes.windll.kernel32.GetCurrentThread()
         ctypes.windll.user32.SetThreadDesktop(h_winlogon)
 
         # 3. Send Ctrl+Alt+Del simulation (only works on physical console session)
