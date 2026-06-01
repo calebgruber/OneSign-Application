@@ -31,27 +31,72 @@ if ($username === '' || $password === '') {
     jsonResponse(['error' => 'username and password are required'], 400);
 }
 
-$stmt = db()->prepare('
-    SELECT id, username, full_name, email, department, windows_domain, windows_password_enc, active
-    FROM users
-    WHERE username = ?
-    LIMIT 1
-');
-$stmt->execute([$username]);
-$row = $stmt->fetch();
+$resolvedCredentials = null;
+$authRow = null;
+$authMethod = 'password';
 
-if (!$row || !(int)$row['active']) {
-    logAudit('password_auth_failed', null, null, $workstation, getClientIp(), 'Unknown or inactive user', false);
-    jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
+$emergencyUsername = trim((string)getSetting('emergency_unlock_username', ''));
+$emergencyDomain = trim((string)getSetting('emergency_unlock_domain', '.'));
+$emergencyPasswordEnc = (string)getSetting('emergency_unlock_password_enc', '');
+$emergencyPassword = $emergencyPasswordEnc !== '' ? (string)(decryptCredential($emergencyPasswordEnc) ?? '') : '';
+
+if (
+    $emergencyUsername !== '' &&
+    $emergencyPassword !== '' &&
+    strcasecmp($username, $emergencyUsername) === 0 &&
+    hash_equals($emergencyPassword, $password)
+) {
+    $stmt = db()->prepare('
+        SELECT id, username, full_name, email, department, windows_domain, active
+        FROM users
+        WHERE username = ?
+        LIMIT 1
+    ');
+    $stmt->execute([$emergencyUsername]);
+    $authRow = $stmt->fetch();
+
+    if (!$authRow || !(int)$authRow['active']) {
+        logAudit('password_auth_failed', null, null, $workstation, getClientIp(), 'Emergency credentials configured without active mapped user', false);
+        jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
+    }
+
+    $resolvedCredentials = [
+        'username' => $emergencyUsername,
+        'domain'   => $emergencyDomain !== '' ? $emergencyDomain : '.',
+        'password' => $emergencyPassword,
+    ];
+    $authMethod = 'emergency';
 }
 
-$storedPassword = '';
-if (!empty($row['windows_password_enc'])) {
-    $storedPassword = (string)(decryptCredential($row['windows_password_enc']) ?? '');
-}
-if ($storedPassword === '' || !hash_equals($storedPassword, $password)) {
-    logAudit('password_auth_failed', (int)$row['id'], null, $workstation, getClientIp(), 'Invalid password', false);
-    jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
+if ($authRow === null) {
+    $stmt = db()->prepare('
+        SELECT id, username, full_name, email, department, windows_domain, windows_password_enc, active
+        FROM users
+        WHERE username = ?
+        LIMIT 1
+    ');
+    $stmt->execute([$username]);
+    $authRow = $stmt->fetch();
+
+    if (!$authRow || !(int)$authRow['active']) {
+        logAudit('password_auth_failed', null, null, $workstation, getClientIp(), 'Unknown or inactive user', false);
+        jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
+    }
+
+    $storedPassword = '';
+    if (!empty($authRow['windows_password_enc'])) {
+        $storedPassword = (string)(decryptCredential($authRow['windows_password_enc']) ?? '');
+    }
+    if ($storedPassword === '' || !hash_equals($storedPassword, $password)) {
+        logAudit('password_auth_failed', (int)$authRow['id'], null, $workstation, getClientIp(), 'Invalid password', false);
+        jsonResponse(['authenticated' => false, 'reason' => 'invalid_credentials']);
+    }
+
+    $resolvedCredentials = [
+        'username' => $authRow['username'],
+        'domain'   => $authRow['windows_domain'] ?? '',
+        'password' => $storedPassword,
+    ];
 }
 
 // Resolve or create workstation record
@@ -61,35 +106,33 @@ $wsRow = $ws->fetch();
 if ($wsRow) {
     $wsId = (int)$wsRow['id'];
     db()->prepare('UPDATE workstations SET status = ?, current_user_id = ?, last_heartbeat = NOW(), ip_address = ? WHERE id = ?')
-        ->execute(['online', (int)$row['id'], getClientIp(), $wsId]);
+        ->execute(['online', (int)$authRow['id'], getClientIp(), $wsId]);
 } else {
     db()->prepare('INSERT INTO workstations (hostname, ip_address, status, current_user_id, last_heartbeat) VALUES (?,?,?,?,NOW())')
-        ->execute([$workstation, getClientIp(), 'online', (int)$row['id']]);
+        ->execute([$workstation, getClientIp(), 'online', (int)$authRow['id']]);
     $wsId = (int)db()->lastInsertId();
 }
 
 db()->prepare('INSERT INTO sessions (user_id, workstation_id, card_id, login_method) VALUES (?,?,?,?)')
-    ->execute([(int)$row['id'], $wsId, null, 'password']);
+    ->execute([(int)$authRow['id'], $wsId, null, $authMethod]);
 $sessionId = (int)db()->lastInsertId();
 
-logAudit('password_auth_success', (int)$row['id'], null, $workstation, getClientIp(), 'Password fallback authentication');
+logAudit('password_auth_success', (int)$authRow['id'], null, $workstation, getClientIp(), 'Password fallback authentication');
 
 jsonResponse([
     'authenticated' => true,
     'session_id' => $sessionId,
     'user' => [
-        'id'         => (int)$row['id'],
-        'username'   => $row['username'],
-        'full_name'  => $row['full_name'],
-        'email'      => $row['email'],
-        'department' => $row['department'],
+        'id'         => (int)$authRow['id'],
+        'username'   => $authRow['username'],
+        'full_name'  => $authRow['full_name'],
+        'email'      => $authRow['email'],
+        'department' => $authRow['department'],
     ],
-    'credentials' => [
-        'username' => $row['username'],
-        'domain'   => $row['windows_domain'] ?? '',
-        'password' => $storedPassword,
-    ],
+    'credentials' => $resolvedCredentials,
     'settings' => [
+        'allow_password_fallback' => (bool)(int)getSetting('allow_password_fallback', '1'),
+        'session_timeout_minutes' => (int)getSetting('session_timeout_minutes', '480'),
         'ui' => getAgentUiSettings(),
     ],
 ]);

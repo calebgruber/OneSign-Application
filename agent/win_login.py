@@ -61,6 +61,12 @@ class INPUT(ctypes.Structure):
         ("_union",  _INPUT_UNION),
     ]
 
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.wintypes.UINT),
+        ("dwTime", ctypes.wintypes.DWORD),
+    ]
+
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -213,6 +219,53 @@ def unlock_workstation(username: str, password: str, domain: str = '.') -> bool:
         if not h_winlogon:
             logger.warning("Could not open Winlogon desktop (err=%d)", ctypes.GetLastError())
             return False
+
+
+def validate_windows_credentials(username: str, password: str, domain: str = '.') -> bool:
+    """
+    Validate provided Windows credentials using LogonUserW.
+
+    This allows local credential checks while the OneSign lock overlay is shown.
+    """
+    user = (username or "").strip()
+    pwd = password or ""
+    dom = (domain or ".").strip() or "."
+    if not user or not pwd:
+            return False
+
+    handle = ctypes.wintypes.HANDLE()
+    LOGON32_LOGON_NETWORK = 3
+    LOGON32_PROVIDER_DEFAULT = 0
+    ok = ctypes.windll.advapi32.LogonUserW(
+            user,
+            dom,
+            pwd,
+            LOGON32_LOGON_NETWORK,
+            LOGON32_PROVIDER_DEFAULT,
+            ctypes.byref(handle),
+    )
+    if not ok:
+            return False
+    try:
+            return True
+    finally:
+            try:
+                ctypes.windll.kernel32.CloseHandle(handle)
+            except Exception:
+                pass
+
+
+def get_idle_seconds() -> float:
+    """
+    Return workstation idle seconds using GetLastInputInfo.
+    """
+    info = LASTINPUTINFO()
+    info.cbSize = ctypes.sizeof(LASTINPUTINFO)
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+            return 0.0
+    tick_now = ctypes.windll.kernel32.GetTickCount()
+    idle_ms = max(0, int(tick_now) - int(info.dwTime))
+    return idle_ms / 1000.0
 
         # 2. Switch our thread to the Winlogon desktop
         h_old = ctypes.windll.kernel32.GetCurrentThread()

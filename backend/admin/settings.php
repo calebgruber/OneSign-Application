@@ -26,6 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'lock_color_panel',
         'lock_color_hex',
         'lock_color_text',
+        'lock_color_hex_left',
+        'lock_color_hex_top',
+        'lock_color_hex_bottom',
+        'lock_color_overlay',
+        'lock_color_submit',
+        'lock_right_title',
+        'lock_right_message',
+        'emergency_unlock_username',
+        'emergency_unlock_domain',
     ];
     foreach ($keys as $k) {
         if (isset($_POST[$k])) {
@@ -38,6 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!empty($_POST['encryption_key']) && $_SESSION['admin_role'] === 'superadmin') {
         db()->prepare('UPDATE settings SET setting_value=? WHERE setting_key=?')->execute([$_POST['encryption_key'], 'encryption_key']);
+    }
+    if (isset($_POST['emergency_unlock_password']) && trim((string)$_POST['emergency_unlock_password']) !== '') {
+        $encEmergency = encryptCredential((string)$_POST['emergency_unlock_password']);
+        db()->prepare('
+            INSERT INTO settings (setting_key, setting_value, description)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        ')->execute(['emergency_unlock_password_enc', $encEmergency, '']);
     }
     $saved = true;
 }
@@ -231,6 +248,16 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="lock_brand_name" class="form-control"
                   value="<?= htmlspecialchars($s['lock_brand_name'] ?? 'Secure log in') ?>">
               </div>
+              <div class="col-lg-4">
+                <label class="form-label">Right panel title</label>
+                <input type="text" name="lock_right_title" class="form-control"
+                  value="<?= htmlspecialchars($s['lock_right_title'] ?? 'OneSign') ?>">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Right panel message</label>
+                <input type="text" name="lock_right_message" class="form-control"
+                  value="<?= htmlspecialchars($s['lock_right_message'] ?? 'Welcome back.\nSingle Sign On is ready when you are.') ?>">
+              </div>
               <div class="col-lg-2">
                 <label class="form-label">Primary color</label>
                 <input type="color" name="lock_color_primary" class="form-control form-control-color"
@@ -247,9 +274,66 @@ include __DIR__ . '/../includes/header.php';
                   value="<?= htmlspecialchars($s['lock_color_hex'] ?? '#F4F6FA') ?>">
               </div>
               <div class="col-lg-2">
+                <label class="form-label">Left hex color</label>
+                <input type="color" name="lock_color_hex_left" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_hex_left'] ?? '#2B4D89') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Top hex color</label>
+                <input type="color" name="lock_color_hex_top" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_hex_top'] ?? '#1D2A43') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Bottom hex color</label>
+                <input type="color" name="lock_color_hex_bottom" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_hex_bottom'] ?? '#1D2A43') ?>">
+              </div>
+              <div class="col-lg-2">
                 <label class="form-label">Text color</label>
                 <input type="color" name="lock_color_text" class="form-control form-control-color"
                   value="<?= htmlspecialchars($s['lock_color_text'] ?? '#FFFFFF') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Submit button</label>
+                <input type="color" name="lock_color_submit" class="form-control form-control-color"
+                  value="<?= htmlspecialchars($s['lock_color_submit'] ?? '#c9222e') ?>">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Overlay color (CSS color)</label>
+                <input type="text" name="lock_color_overlay" class="form-control"
+                  placeholder="rgba(0,0,0,0.50)"
+                  value="<?= htmlspecialchars($s['lock_color_overlay'] ?? 'rgba(0,0,0,0.50)') ?>">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="card border-warning">
+          <div class="card-header">
+            <h3 class="card-title"><i class="ti ti-key me-2 text-yellow"></i>Emergency Unlock Credentials</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              These credentials can be used as a backend emergency override on locked workstations.
+            </p>
+            <div class="row g-3">
+              <div class="col-lg-4">
+                <label class="form-label">Emergency username</label>
+                <input type="text" name="emergency_unlock_username" class="form-control"
+                  value="<?= htmlspecialchars($s['emergency_unlock_username'] ?? '') ?>">
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Emergency domain</label>
+                <input type="text" name="emergency_unlock_domain" class="form-control"
+                  value="<?= htmlspecialchars($s['emergency_unlock_domain'] ?? '.') ?>">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Emergency password</label>
+                <input type="password" name="emergency_unlock_password" class="form-control"
+                  placeholder="Leave blank to keep current password">
+                <div class="form-hint">Stored encrypted on save.</div>
               </div>
             </div>
           </div>

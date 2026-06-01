@@ -24,6 +24,13 @@ function getAgentUiSettings(): array {
         'lock_color_panel'      => getSetting('lock_color_panel', '#1D2A43'),
         'lock_color_hex'        => getSetting('lock_color_hex', '#F4F6FA'),
         'lock_color_text'       => getSetting('lock_color_text', '#FFFFFF'),
+        'lock_color_hex_left'   => getSetting('lock_color_hex_left', ''),
+        'lock_color_hex_top'    => getSetting('lock_color_hex_top', ''),
+        'lock_color_hex_bottom' => getSetting('lock_color_hex_bottom', ''),
+        'lock_color_overlay'    => getSetting('lock_color_overlay', 'rgba(0,0,0,0.50)'),
+        'lock_color_submit'     => getSetting('lock_color_submit', '#c9222e'),
+        'lock_right_title'      => getSetting('lock_right_title', 'OneSign'),
+        'lock_right_message'    => getSetting('lock_right_message', "Welcome back.\nSingle Sign On is ready when you are."),
     ];
 }
 

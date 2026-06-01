@@ -44,6 +44,8 @@ from pcprox    import PcProxReader, PcProxError
 from win_login import (
     unlock_workstation,
     is_workstation_locked,
+    validate_windows_credentials,
+    get_idle_seconds,
 )
 from session_shell import SessionShell
 from tray_app  import TrayApp
@@ -218,6 +220,10 @@ class OneSignAgent:
         self._current_commit = self._resolve_local_commit()
         self._current_version = APP_VERSION
         self._ui_settings = dict(self.config.items("ui")) if self.config.has_section("ui") else {}
+        self._runtime_settings: dict[str, Any] = {
+            "allow_password_fallback": True,
+            "session_timeout_minutes": 0,
+        }
         self.session_shell = SessionShell(
             on_lock_requested=self._lock_from_session_shell,
             on_password_login=self._handle_password_login,
@@ -277,6 +283,13 @@ class OneSignAgent:
         settings = payload.get("settings")
         if not isinstance(settings, dict):
             return
+        if "allow_password_fallback" in settings:
+            self._runtime_settings["allow_password_fallback"] = bool(settings.get("allow_password_fallback"))
+        if "session_timeout_minutes" in settings:
+            try:
+                self._runtime_settings["session_timeout_minutes"] = max(0, int(settings.get("session_timeout_minutes") or 0))
+            except (TypeError, ValueError):
+                pass
         ui = settings.get("ui")
         if isinstance(ui, dict):
             normalized = {}
@@ -717,6 +730,10 @@ class OneSignAgent:
         t_upd = threading.Thread(target=self._update_loop, daemon=True)
         t_upd.start()
 
+        # Idle lock thread
+        t_idle = threading.Thread(target=self._idle_lock_loop, daemon=True)
+        t_idle.start()
+
         # Tray (blocks until exit)
         self.tray.set_status("idle", "OneSign Agent — Ready")
         self.tray.start()
@@ -776,6 +793,27 @@ class OneSignAgent:
                             self._reader_reconnect_requested = False
                             break
                     time.sleep(interval)
+
+    def _idle_lock_loop(self):
+        while self._running:
+                    try:
+                        timeout_minutes = int(self._runtime_settings.get("session_timeout_minutes") or 0)
+                        if timeout_minutes <= 0:
+                            time.sleep(5)
+                            continue
+                        if is_workstation_locked() or self.session_shell.is_visible():
+                            time.sleep(5)
+                            continue
+                        idle_seconds = get_idle_seconds()
+                        if idle_seconds >= (timeout_minutes * 60):
+                            logger.info("Auto-locking workstation after %.1f minutes of inactivity", timeout_minutes)
+                            self._active_session_card = None
+                            self.tray.set_status("locked", "OneSign — Auto-locked for inactivity")
+                            self.session_shell.show_lock(HOSTNAME)
+                            time.sleep(2)
+                    except Exception as exc:
+                        logger.debug("Idle lock loop error: %s", exc)
+                    time.sleep(5)
                     continue
                 logger.info("Card detected: %s", card_hex)
                 self._last_card_hex      = card_hex
@@ -924,6 +962,25 @@ class OneSignAgent:
             self.session_shell.notify_auth_failed("Username and password are required.")
             return
 
+        local_user = username
+        local_domain = "."
+        if "\\" in username:
+            local_domain, local_user = username.split("\\", 1)
+            local_domain = local_domain.strip() or "."
+            local_user = local_user.strip()
+
+        if local_user and validate_windows_credentials(local_user, password, local_domain):
+            unlock_ok = True
+            if is_workstation_locked():
+                unlock_ok = bool(unlock_workstation(local_user, password, local_domain))
+            if unlock_ok:
+                display_name = local_user or username
+                self._active_session_card = None
+                self._notify_login_success(display_name)
+                self.tray.set_status("connected", f"OneSign — {display_name}")
+                self.session_shell.notify_auth_success(display_name)
+                return
+
         url = self.get_server_base_url() + "/api/password_auth.php"
         try:
             resp = self._session.post(url, json={
@@ -938,7 +995,7 @@ class OneSignAgent:
             return
 
         if resp.status_code != 200:
-            msg = "Authentication failed."
+            msg = "Invalid username or password."
             try:
                 payload = resp.json()
                 reason = str(payload.get("reason", "")).strip()

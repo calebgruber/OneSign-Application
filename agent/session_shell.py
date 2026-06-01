@@ -3,9 +3,12 @@ import itertools
 import json
 import logging
 import mimetypes
+import os
 import queue
 import threading
 import time
+import ctypes
+import ctypes.wintypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -78,6 +81,7 @@ class SessionShell:
             "panel_message": str(self._theme.get("lock_right_message", "Welcome back.\nSingle Sign On is ready when you are.")),
             "workstation": "Unknown",
             "display_name": "",
+            "default_username": self._resolve_default_username(),
         }
         self._http_server: ThreadingHTTPServer | None = None
         self._http_thread: threading.Thread | None = None
@@ -86,6 +90,17 @@ class SessionShell:
         self._webview_stop = threading.Event()
         self._theme_assets: dict[str, Path] = {}
         self._lockscreen_path = Path(__file__).resolve().with_name("lockscreen.html")
+        self._keyboard_guard_stop = threading.Event()
+        self._keyboard_guard_thread: threading.Thread | None = None
+        self._keyboard_guard_thread_id = 0
+        self._keyboard_guard_lock = threading.Lock()
+
+    def _resolve_default_username(self) -> str:
+        user = (os.environ.get("USERNAME") or "").strip()
+        domain = (os.environ.get("USERDOMAIN") or "").strip()
+        if not user or user.upper() == "SYSTEM":
+            return ""
+        return f"{domain}\\{user}" if domain and domain.upper() != "WORKGROUP" else user
 
     @property
     def available(self) -> bool:
@@ -111,6 +126,10 @@ class SessionShell:
         if not self._available or not self._running:
             return
         self._queue.put(("hide", ()))
+
+    def is_visible(self) -> bool:
+        state = str(self._get_status().get("state", "hidden"))
+        return state != "hidden"
 
     def stop(self):
         if not self._available or not self._running:
@@ -140,14 +159,124 @@ class SessionShell:
             return dict(self._status)
 
     def _lockscreen_asset_path(self) -> Path:
-        if self._lockscreen_path.is_file():
-            return self._lockscreen_path
-        base_dir = Path(__file__).resolve().parent
-        for name in ("imprivata-login.html", "imprivata-login (1).html"):
-            candidate = base_dir / name
-            if candidate.is_file():
-                return candidate
-        return base_dir / "lockscreen.html"
+        return self._lockscreen_path
+
+    def _set_keyboard_guard(self, enabled: bool):
+        with self._keyboard_guard_lock:
+            if enabled:
+                if self._keyboard_guard_thread and self._keyboard_guard_thread.is_alive():
+                    return
+                self._keyboard_guard_stop.clear()
+                self._keyboard_guard_thread = threading.Thread(
+                    target=self._keyboard_guard_loop,
+                    daemon=True,
+                    name="OneSign-KeyGuard",
+                )
+                self._keyboard_guard_thread.start()
+                return
+
+            self._keyboard_guard_stop.set()
+            thread_id = self._keyboard_guard_thread_id
+            if thread_id:
+                try:
+                    ctypes.windll.user32.PostThreadMessageW(thread_id, 0x0012, 0, 0)  # WM_QUIT
+                except Exception:
+                    pass
+
+    def _keyboard_guard_loop(self):
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        WH_KEYBOARD_LL = 13
+        HC_ACTION = 0
+        WM_KEYDOWN = 0x0100
+        WM_SYSKEYDOWN = 0x0104
+        VK_TAB = 0x09
+        VK_ESCAPE = 0x1B
+        VK_DELETE = 0x2E
+        VK_F4 = 0x73
+        VK_LWIN = 0x5B
+        VK_RWIN = 0x5C
+        VK_MENU = 0x12
+        VK_CONTROL = 0x11
+        VK_SHIFT = 0x10
+
+        class KBDLLHOOKSTRUCT(ctypes.Structure):
+            _fields_ = [
+                ("vkCode", ctypes.wintypes.DWORD),
+                ("scanCode", ctypes.wintypes.DWORD),
+                ("flags", ctypes.wintypes.DWORD),
+                ("time", ctypes.wintypes.DWORD),
+                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+            ]
+
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+        class MSG(ctypes.Structure):
+            _fields_ = [
+                ("hwnd", ctypes.wintypes.HWND),
+                ("message", ctypes.wintypes.UINT),
+                ("wParam", ctypes.wintypes.WPARAM),
+                ("lParam", ctypes.wintypes.LPARAM),
+                ("time", ctypes.wintypes.DWORD),
+                ("pt", POINT),
+                ("lPrivate", ctypes.wintypes.DWORD),
+            ]
+
+        def _is_down(vk: int) -> bool:
+            try:
+                return bool(user32.GetAsyncKeyState(vk) & 0x8000)
+            except Exception:
+                return False
+
+        proc_type = ctypes.WINFUNCTYPE(ctypes.wintypes.LPARAM, ctypes.c_int, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+
+        @proc_type
+        def low_level_proc(n_code, w_param, l_param):
+            if n_code == HC_ACTION and w_param in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                info = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                vk = int(info.vkCode)
+                alt = _is_down(VK_MENU)
+                ctrl = _is_down(VK_CONTROL)
+                shift = _is_down(VK_SHIFT)
+                should_block = (
+                    vk in (VK_LWIN, VK_RWIN)
+                    or (vk == VK_TAB and alt)
+                    or (vk == VK_F4 and alt)
+                    or (vk == VK_ESCAPE and alt)
+                    or (vk == VK_ESCAPE and ctrl)
+                    or (vk == VK_ESCAPE and ctrl and shift)
+                    or (vk == VK_DELETE and ctrl and alt)
+                )
+                if should_block:
+                    return 1
+            return user32.CallNextHookEx(None, n_code, w_param, l_param)
+
+        hook = user32.SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            low_level_proc,
+            kernel32.GetModuleHandleW(None),
+            0,
+        )
+        if not hook:
+            logger.warning("Could not install lock keyboard guard")
+            return
+
+        self._keyboard_guard_thread_id = int(kernel32.GetCurrentThreadId())
+        msg = MSG()
+        try:
+            while not self._keyboard_guard_stop.is_set():
+                result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+                if result in (0, -1):
+                    break
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
+        finally:
+            try:
+                user32.UnhookWindowsHookEx(hook)
+            except Exception:
+                pass
+            self._keyboard_guard_thread_id = 0
 
     def _resolve_local_image(self, source: str) -> Path | None:
         raw = (source or "").strip()
@@ -334,6 +463,7 @@ class SessionShell:
                 continue
             if command == "show_lock":
                 workstation = str(args[0] or "Unknown")
+                self._set_keyboard_guard(True)
                 self._set_status(
                     state="locking",
                     helper="Locking workstation...",
@@ -354,6 +484,7 @@ class SessionShell:
                     except Exception:
                         pass
             elif command == "hide":
+                self._set_keyboard_guard(False)
                 self._set_status(state="hidden")
                 self._sync_web_status()
                 window = self._webview_window
@@ -414,6 +545,7 @@ class SessionShell:
                 if callable(self._on_lock_requested):
                     threading.Thread(target=self._on_lock_requested, daemon=True).start()
             elif command == "stop":
+                self._set_keyboard_guard(False)
                 self._webview_stop.set()
                 window = self._webview_window
                 if window is not None:
@@ -444,6 +576,7 @@ class SessionShell:
         try:
             webview.start(gui="edgechromium")
         finally:
+            self._set_keyboard_guard(False)
             self._webview_stop.set()
             self._webview_window = None
             self._stop_http_server()

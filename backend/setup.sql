@@ -152,7 +152,17 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('lock_color_primary', '#2B4D89', 'Primary lock overlay background color'),
 ('lock_color_panel', '#1D2A43', 'Right panel lock overlay background color'),
 ('lock_color_hex', '#F4F6FA', 'Hex tile background color on lock overlay'),
-('lock_color_text', '#FFFFFF', 'Primary text color on lock overlay')
+('lock_color_text', '#FFFFFF', 'Primary text color on lock overlay'),
+('lock_color_hex_left', '', 'Left hex tile color override'),
+('lock_color_hex_top', '', 'Top hex tile color override'),
+('lock_color_hex_bottom', '', 'Bottom hex tile color override'),
+('lock_color_overlay', 'rgba(0,0,0,0.50)', 'Lockscreen background overlay color'),
+('lock_color_submit', '#c9222e', 'Lockscreen submit button color'),
+('lock_right_title', 'OneSign', 'Lockscreen right panel title'),
+('lock_right_message', 'Welcome back.\\nSingle Sign On is ready when you are.', 'Lockscreen right panel message'),
+('emergency_unlock_username', '', 'Emergency unlock username'),
+('emergency_unlock_domain', '.', 'Emergency unlock domain'),
+('emergency_unlock_password_enc', '', 'Encrypted emergency unlock password')
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
 
 -- Generate a default API key
