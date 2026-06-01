@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'credential_provider_timeout_seconds',
         'lock_background_image',
         'lock_logo_image',
+        'lock_hex_logo_image',
         'lock_brand_name',
         'lock_color_primary',
         'lock_color_panel',
@@ -243,6 +244,12 @@ include __DIR__ . '/../includes/header.php';
                   placeholder="https://..."
                   value="<?= htmlspecialchars($s['lock_logo_image'] ?? '') ?>">
               </div>
+              <div class="col-lg-6">
+                <label class="form-label">Hex cluster logo URL <small class="text-muted">(left hexagon; defaults to logo image)</small></label>
+                <input type="url" name="lock_hex_logo_image" class="form-control"
+                  placeholder="https://..."
+                  value="<?= htmlspecialchars($s['lock_hex_logo_image'] ?? '') ?>">
+              </div>
               <div class="col-lg-4">
                 <label class="form-label">Brand text</label>
                 <input type="text" name="lock_brand_name" class="form-control"
@@ -251,7 +258,7 @@ include __DIR__ . '/../includes/header.php';
               <div class="col-lg-4">
                 <label class="form-label">Right panel title</label>
                 <input type="text" name="lock_right_title" class="form-control"
-                  value="<?= htmlspecialchars($s['lock_right_title'] ?? 'OneSign') ?>">
+                  value="<?= htmlspecialchars($s['lock_right_title'] ?? '') ?>">
               </div>
               <div class="col-lg-4">
                 <label class="form-label">Right panel message</label>

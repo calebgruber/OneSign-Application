@@ -300,7 +300,7 @@ class SessionShell:
     def _build_theme_payload(self) -> dict:
         payload = dict(self._theme)
         assets: dict[str, Path] = {}
-        for key in ("lock_background_image", "lock_logo_image"):
+        for key in ("lock_background_image", "lock_logo_image", "lock_hex_logo_image"):
             source = str(payload.get(key, "") or "")
             local_path = self._resolve_local_image(source)
             if local_path is not None:

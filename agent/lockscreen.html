@@ -62,7 +62,7 @@ body.password-fallback-disabled #stateTyping {
   gap:clamp(7px,0.8vw,12px);
 }
 .logo-top-right .logo-image {
-  width: clamp(160px, 18vw, 270px);
+  width: clamp(80px, 9vw, 130px);
   height: auto;
   display: block;
 }
@@ -541,6 +541,7 @@ function buildTheme(themePayload = {}) {
     backgroundImage: getThemeValue(themePayload, "lock_background_image", CONFIG.backgroundImage),
     logoImage: getThemeValue(themePayload, "lock_logo_image", CONFIG.logoImage),
     menuLogoImage: CONFIG.menuLogoImage || getThemeValue(themePayload, "lock_logo_image", CONFIG.logoImage),
+    hexLogoImage: getThemeValue(themePayload, "lock_hex_logo_image", ""),
     colorHexLeft: normalizeColor(
       getThemeValue(themePayload, "lock_color_hex_left", getThemeValue(themePayload, "lock_color_hex", lockPrimary)),
       fallbackLeft,
@@ -561,7 +562,7 @@ function buildTheme(themePayload = {}) {
     usernameLabel: CONFIG.usernameLabel,
     usernamePlaceholder: CONFIG.usernamePlaceholder,
     brandName: getThemeValue(themePayload, "lock_brand_name", "Secure Log In"),
-    rightTitle: getThemeValue(themePayload, "lock_right_title", "OneSign"),
+    rightTitle: getThemeValue(themePayload, "lock_right_title", ""),
     rightMessage: getThemeValue(themePayload, "lock_right_message", "Welcome back.\nSingle Sign On is ready when you are."),
     allowPasswordFallback,
   };
@@ -573,10 +574,12 @@ function applyTheme(themePayload = {}) {
   const bgEl = document.querySelector(".bg-img");
   if (bgEl && currentTheme.backgroundImage) bgEl.src = currentTheme.backgroundImage;
 
-  ["logoTopImage", "slabLogoImage", "tsLogoImage", "lsLogoImage"].forEach((id) => {
+  ["logoTopImage", "tsLogoImage", "lsLogoImage"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.src = currentTheme.logoImage;
   });
+  const slabLogoEl = document.getElementById("slabLogoImage");
+  if (slabLogoEl) slabLogoEl.src = currentTheme.hexLogoImage || currentTheme.logoImage;
   if (menuLogoImage) menuLogoImage.src = currentTheme.menuLogoImage || currentTheme.logoImage;
 
   const rootStyle = document.documentElement.style;
@@ -604,7 +607,7 @@ function applyTheme(themePayload = {}) {
   usernameLabelEl.textContent = currentTheme.usernameLabel;
   usernameInput.placeholder = currentTheme.usernamePlaceholder;
   usernameTyping.placeholder = currentTheme.usernamePlaceholder;
-  if (sidePanelTitle) sidePanelTitle.textContent = String(currentTheme.rightTitle || "OneSign").trim() || "OneSign";
+  if (sidePanelTitle) sidePanelTitle.textContent = String(currentTheme.rightTitle || "").trim();
   if (sidePanelMessage) sidePanelMessage.textContent = String(currentTheme.rightMessage || "").trim();
   document.body.classList.toggle("password-fallback-disabled", !currentTheme.allowPasswordFallback);
 

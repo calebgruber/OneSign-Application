@@ -786,6 +786,10 @@ class OneSignAgent:
         t_idle = threading.Thread(target=self._idle_lock_loop, daemon=True)
         t_idle.start()
 
+        # Home-key lock thread
+        t_home = threading.Thread(target=self._home_key_lock_loop, daemon=True, name="OneSign-HomeKeyLock")
+        t_home.start()
+
         # Tray runs in a background thread so the main thread stays free for
         # the pywebview event loop (which requires the main thread on Windows).
         self.tray.set_status("idle", "OneSign Agent — Ready")
@@ -913,6 +917,94 @@ class OneSignAgent:
             except Exception as exc:
                 logger.debug("Idle lock loop error: %s", exc)
             time.sleep(5)
+
+    def _home_key_lock_loop(self):
+        """Install a low-level keyboard hook that triggers a workstation lock
+        whenever the Home key is pressed while the session is active (not
+        already locked/showing the overlay).  Mirrors the behaviour of a
+        badge tap-out."""
+        try:
+            import ctypes
+            import ctypes.wintypes
+            user32   = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+        except Exception:
+            logger.debug("Home-key lock hook unavailable on this platform")
+            return
+
+        WH_KEYBOARD_LL = 13
+        HC_ACTION       = 0
+        WM_KEYDOWN      = 0x0100
+        WM_SYSKEYDOWN   = 0x0104
+        VK_HOME         = 0x24
+
+        class KBDLLHOOKSTRUCT(ctypes.Structure):
+            _fields_ = [
+                ("vkCode",      ctypes.wintypes.DWORD),
+                ("scanCode",    ctypes.wintypes.DWORD),
+                ("flags",       ctypes.wintypes.DWORD),
+                ("time",        ctypes.wintypes.DWORD),
+                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+            ]
+
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+        class MSG(ctypes.Structure):
+            _fields_ = [
+                ("hwnd",     ctypes.wintypes.HWND),
+                ("message",  ctypes.wintypes.UINT),
+                ("wParam",   ctypes.wintypes.WPARAM),
+                ("lParam",   ctypes.wintypes.LPARAM),
+                ("time",     ctypes.wintypes.DWORD),
+                ("pt",       POINT),
+                ("lPrivate", ctypes.wintypes.DWORD),
+            ]
+
+        agent = self
+        proc_type = ctypes.WINFUNCTYPE(
+            ctypes.wintypes.LPARAM,
+            ctypes.c_int,
+            ctypes.wintypes.WPARAM,
+            ctypes.wintypes.LPARAM,
+        )
+
+        @proc_type
+        def _hook_proc(n_code, w_param, l_param):
+            if n_code == HC_ACTION and w_param in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                info = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                if int(info.vkCode) == VK_HOME:
+                    if not is_workstation_locked() and not agent.session_shell.is_visible():
+                        logger.info("Home key pressed — locking workstation")
+                        agent._active_session_card = None
+                        agent.tray.set_status("locked", "OneSign — Locked by Home key")
+                        agent.session_shell.show_lock(HOSTNAME)
+            return user32.CallNextHookEx(None, n_code, w_param, l_param)
+
+        hook = user32.SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            _hook_proc,
+            kernel32.GetModuleHandleW(None),
+            0,
+        )
+        if not hook:
+            logger.warning("Could not install Home-key lock hook")
+            return
+
+        msg = MSG()
+        try:
+            while self._running:
+                result = user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1)
+                if result > 0:
+                    user32.TranslateMessage(ctypes.byref(msg))
+                    user32.DispatchMessageW(ctypes.byref(msg))
+                else:
+                    time.sleep(0.05)
+        finally:
+            try:
+                user32.UnhookWindowsHookEx(hook)
+            except Exception:
+                pass
 
     def _refresh_enrollment_mode(self, now: float | None = None):
         now = now if now is not None else time.monotonic()
