@@ -15,6 +15,7 @@ const CONFIG = {
   menuLogoImage:       "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath fill='%23ce202f' d='M28.95 34.25v93.75H122.8V34.25H28.95Zm59.32 84.82H63.48V42.87h24.79Z'/%3E%3Crect fill='%23ce202f' x='63.48' y='5.5' width='24.78' height='19.36'/%3E%3C/svg%3E",
   colorRedHex:         "#ff2d55",
   colorNavyHex:        "#0057ff",
+  hexClusterShiftX:    "-2.2vw",
   colorOverlay:        "rgba(0,0,0,0.50)",
   colorSubmitBtn:      "#c9222e",
   stationLabel:        "WORKSTATION:",
@@ -87,7 +88,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   --hex-h: clamp(132px, 13.5vw, 178px); /* height of hex */
   --hex-w: calc(var(--hex-h) * 1.1547); /* width = h * sqrt(3) */
   --hex-gap: 0px;
-  --hex-cluster-shift-x: 0px;
+  --hex-cluster-shift-x: -2.2vw;
   --hex-red-color: #c92235;
   --hex-navy-color: #000133;
 }
@@ -373,6 +374,14 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
 
 <script>
 (function applyConfig() {
+  const normalizeColor = (value, fallback) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return fallback;
+    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return raw;
+    if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw)) return `#${raw}`;
+    return raw;
+  };
+
   const bgEl = document.querySelector(".bg-img");
   if (CONFIG.backgroundImage) bgEl.src = CONFIG.backgroundImage;
 
@@ -384,15 +393,26 @@ html, body { width:100%; height:100%; overflow:hidden; background:#000; -webkit-
   const menuLogo = document.getElementById("menuLogoImage");
   if (menuLogo) menuLogo.src = CONFIG.menuLogoImage || CONFIG.logoImage;
 
-  const rootStyle = document.documentElement.style;
-  rootStyle.setProperty("--hex-red-color", CONFIG.colorRedHex);
-  rootStyle.setProperty("--hex-navy-color", CONFIG.colorNavyHex);
+  const rootEl = document.documentElement;
+  const rootStyle = rootEl.style;
+  const computedStyle = getComputedStyle(rootEl);
+  const redFallback = computedStyle.getPropertyValue("--hex-red-color").trim() || "#c92235";
+  const navyFallback = computedStyle.getPropertyValue("--hex-navy-color").trim() || "#000133";
+  const redColor = normalizeColor(CONFIG.colorRedHex, redFallback);
+  const navyColor = normalizeColor(CONFIG.colorNavyHex, navyFallback);
+  rootStyle.setProperty("--hex-red-color", redColor);
+  rootStyle.setProperty("--hex-navy-color", navyColor);
+
+  const clusterShift = String(CONFIG.hexClusterShiftX ?? "").trim();
+  if (clusterShift) {
+    rootStyle.setProperty("--hex-cluster-shift-x", clusterShift);
+  }
 
   const ov = document.getElementById("overlayFull");
   ov.style.background = CONFIG.colorOverlay;
   ov.style.opacity = "1";
 
-  document.getElementById("submitBtn").style.background = CONFIG.colorSubmitBtn;
+  document.getElementById("submitBtn").style.background = normalizeColor(CONFIG.colorSubmitBtn, "#c9222e");
 
   document.getElementById("stationLabelEl").textContent  = CONFIG.stationLabel;
   document.getElementById("stationIDEl").textContent     = CONFIG.stationID;
