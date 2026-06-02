@@ -1,0 +1,231 @@
+<?php
+/**
+ * Workstations — Tabler UI
+ */
+require_once __DIR__ . '/../includes/auth_check.php';
+require_once __DIR__ . '/../includes/db.php';
+requireAdminLogin();
+$pageTitle = 'Workstations';
+include __DIR__ . '/../includes/header.php';
+?>
+
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Workstations</h2>
+        <div class="text-muted mt-1">PCs running the OneSign agent</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+
+    <!-- API Keys card -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-key me-2 text-blue"></i>Agent API Keys</h3>
+        <div class="card-options">
+          <button class="btn btn-sm btn-primary" onclick="createApiKey()">
+            <i class="ti ti-plus me-1"></i>Generate Key
+          </button>
+        </div>
+      </div>
+      <div class="card-body pb-0">
+        <p class="text-muted small mb-3">Copy a key into <code>config.ini</code> on each workstation running the agent.</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>API Key</th>
+              <th>Workstation</th>
+              <th>Last Used</th>
+              <th class="text-center">Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="keys-tbody">
+            <tr><td colspan="6" class="text-center text-muted py-3">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Workstations card -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-device-desktop me-2 text-blue"></i>Registered Workstations</h3>
+        <div class="card-options">
+          <button class="btn btn-sm btn-ghost-secondary" onclick="refreshWorkstationsWithPing(true)">
+            <i class="ti ti-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Hostname</th>
+              <th>IP Address</th>
+              <th class="text-center">Status</th>
+              <th>Current User</th>
+              <th>OS</th>
+              <th>Agent</th>
+              <th>Last Heartbeat</th>
+            </tr>
+          </thead>
+          <tbody id="ws-tbody">
+            <tr><td colspan="7" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let pingFollowupPoller = null;
+
+async function parseJsonResponse(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid server response (HTTP ${res.status})`);
+  }
+}
+
+async function loadApiKeys() {
+  const res  = await fetch('../api/apikeys.php');
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(data.error || `Failed to load API keys (HTTP ${res.status})`);
+  const tbody = document.getElementById('keys-tbody');
+  if (!Array.isArray(data) || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No API keys. Generate one above.</td></tr>'; return; }
+  tbody.innerHTML = data.map(k => `
+    <tr>
+      <td class="fw-semibold">${escHtml(k.label)}</td>
+      <td><code class="user-select-all small">${escHtml(k.api_key)}</code></td>
+      <td>${escHtml(k.workstation || 'Any')}</td>
+      <td class="text-muted">${k.last_used ? fmtDate(k.last_used, true) : '<span class="text-muted">Never</span>'}</td>
+      <td class="text-center">${k.active
+        ? '<span class="badge onesign-badge-green">Active</span>'
+        : '<span class="badge onesign-badge-red">Revoked</span>'}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-ghost-danger" onclick="deleteKey(${k.id})" title="Revoke">
+          <i class="ti ti-trash"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function loadWorkstations() {
+  const res  = await fetch('../api/workstations.php');
+  const data = await parseJsonResponse(res);
+  const tbody = document.getElementById('ws-tbody');
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to load workstations (HTTP ${res.status})`);
+  }
+  if (!Array.isArray(data) || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No workstations registered yet.</td></tr>'; return; }
+  tbody.innerHTML = data.map(w => {
+    const effectiveStatus = w.effective_status || w.status || 'offline';
+    const cls = effectiveStatus === 'online' ? 'onesign-badge-green' : effectiveStatus === 'locked' ? 'onesign-badge-yellow' : 'onesign-badge-gray';
+    const pingBadge = w.ping_state === 'pending'
+      ? '<span class="badge onesign-badge-blue ms-1">pinging</span>'
+      : w.ping_state === 'ack'
+        ? '<span class="badge onesign-badge-green ms-1">ping ok</span>'
+        : w.ping_state === 'timeout'
+          ? '<span class="badge onesign-badge-red ms-1">no ping</span>'
+          : '';
+    return `
+      <tr>
+        <td class="fw-semibold">${escHtml(w.hostname)}</td>
+        <td class="text-muted">${escHtml(w.ip_address || '—')}</td>
+        <td class="text-center"><span class="badge ${cls}">${escHtml(effectiveStatus)}</span>${pingBadge}</td>
+        <td>${escHtml(w.current_user || '—')}</td>
+        <td class="text-muted small">${escHtml(w.os_version || '—')}</td>
+        <td class="text-muted">${escHtml(w.agent_version || '—')}</td>
+        <td class="text-muted">${w.last_heartbeat ? fmtDate(w.last_heartbeat, true) : '—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+async function requestWorkstationPingAll() {
+  const r = await fetch('../api/workstations.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'ping_all' }),
+  });
+  const payload = await parseJsonResponse(r);
+  if (!r.ok) throw new Error(payload.error || `Failed to ping workstations (HTTP ${r.status})`);
+  return payload;
+}
+
+function startPingFollowupPolling() {
+  clearInterval(pingFollowupPoller);
+  let attempts = 0;
+  pingFollowupPoller = setInterval(async () => {
+    attempts++;
+    await loadWorkstations();
+    if (attempts >= 12) {
+      clearInterval(pingFollowupPoller);
+    }
+  }, 5000);
+}
+
+async function refreshWorkstationsWithPing(showErrors = false) {
+  try {
+    const pingResponse = await requestWorkstationPingAll();
+    await loadWorkstations();
+    startPingFollowupPolling();
+    if (showErrors && pingResponse && pingResponse.ping_supported === false) {
+      alert(pingResponse.message || 'Live ping checks are currently unavailable.');
+    }
+  } catch (err) {
+    try {
+      await loadWorkstations();
+    } catch (loadErr) {
+      if (showErrors) {
+        alert(loadErr.message || 'Failed to load workstation status.');
+      }
+      return;
+    }
+    if (showErrors) {
+      alert(err.message || 'Failed to refresh workstation status.');
+    }
+  }
+}
+
+async function createApiKey() {
+  const label = prompt('Label for this API key (e.g. workstation name):');
+  if (!label) return;
+  const r = await fetch('../api/apikeys.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  });
+  const payload = await parseJsonResponse(r).catch(() => ({}));
+  if (r.ok) loadApiKeys(); else alert(payload.error || 'Failed to create key.');
+}
+
+async function deleteKey(id) {
+  if (!confirm('Revoke this API key? Agents using it will stop working.')) return;
+  await fetch(`../api/apikeys.php?id=${id}`, { method: 'DELETE' });
+  loadApiKeys();
+}
+
+loadApiKeys();
+refreshWorkstationsWithPing();
+setInterval(() => refreshWorkstationsWithPing(false), 60000);
+</script>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
