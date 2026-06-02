@@ -146,7 +146,7 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('credential_provider_enabled', '0', 'Use external credential provider helper for workstation unlocks'),
 ('credential_provider_command', '', 'Command to invoke credential provider helper (receives JSON on stdin)'),
 ('credential_provider_timeout_seconds', '20', 'Max seconds to wait for credential provider helper process'),
-('lock_background_image', '', 'Newline-separated URLs for the rotating lock overlay background image'),
+('lock_background_image', '', 'Rotating lock overlay background image URLs (one URL per line)'),
 ('lock_background_rotation_seconds', '300', 'Seconds each shared lock overlay background image is shown before rotating'),
 ('lock_logo_image', '', 'URL for custom lock overlay logo image'),
 ('lock_brand_name', 'Secure log in', 'Brand text shown on lock overlay'),

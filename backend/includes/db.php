@@ -4,6 +4,8 @@
  */
 require_once __DIR__ . '/../config/database.php';
 
+const LOCK_BACKGROUND_ROTATION_MIN_SECONDS = 30;
+
 function db(): PDO {
     return Database::getConnection();
 }
@@ -16,7 +18,11 @@ function getSetting(string $key, string $default = ''): string {
 }
 
 function getLockBackgroundRotationSeconds(): int {
-    return max(30, (int)getSetting('lock_background_rotation_seconds', '300'));
+    $seconds = (int)getSetting('lock_background_rotation_seconds', '300');
+    if ($seconds <= 0) {
+        $seconds = 300;
+    }
+    return max(LOCK_BACKGROUND_ROTATION_MIN_SECONDS, $seconds);
 }
 
 function getActiveLockBackgroundImage(): string {
