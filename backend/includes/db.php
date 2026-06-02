@@ -4,8 +4,6 @@
  */
 require_once __DIR__ . '/../config/database.php';
 
-const LOCK_BACKGROUND_ROTATION_MIN_SECONDS = 30;
-
 function db(): PDO {
     return Database::getConnection();
 }
@@ -18,11 +16,12 @@ function getSetting(string $key, string $default = ''): string {
 }
 
 function getLockBackgroundRotationSeconds(): int {
+    $minimumSeconds = 30;
     $seconds = (int)getSetting('lock_background_rotation_seconds', '300');
     if ($seconds <= 0) {
         $seconds = 300;
     }
-    return max(LOCK_BACKGROUND_ROTATION_MIN_SECONDS, $seconds);
+    return max($minimumSeconds, $seconds);
 }
 
 function getActiveLockBackgroundImage(): string {
@@ -40,6 +39,8 @@ function getActiveLockBackgroundImage(): string {
     }
 
     $interval = getLockBackgroundRotationSeconds();
+    // Bucket the current server time into shared intervals so every agent
+    // receives the same active image during the same time window.
     $index = (int)(floor(time() / $interval) % count($images));
     return $images[$index];
 }

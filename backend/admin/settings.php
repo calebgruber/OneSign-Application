@@ -234,7 +234,7 @@ include __DIR__ . '/../includes/header.php';
             </p>
             <div class="row g-3">
               <div class="col-lg-6">
-                <label class="form-label">Background image URLs <small class="text-muted">(one per line; rotates for every agent together)</small></label>
+                <label class="form-label">Background image URLs <small class="text-muted">(enter one URL per line; all agents rotate together)</small></label>
                 <textarea name="lock_background_image" class="form-control" rows="4"
                   placeholder="https://example.com/slide-1.jpg
 https://example.com/slide-2.jpg"><?= htmlspecialchars($s['lock_background_image'] ?? '') ?></textarea>
