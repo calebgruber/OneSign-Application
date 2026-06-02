@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'credential_provider_command',
         'credential_provider_timeout_seconds',
         'lock_background_image',
+        'lock_background_rotation_seconds',
         'lock_logo_image',
         'lock_hex_logo_image',
         'lock_brand_name',
@@ -233,10 +234,14 @@ include __DIR__ . '/../includes/header.php';
             </p>
             <div class="row g-3">
               <div class="col-lg-6">
-                <label class="form-label">Background image URL</label>
-                <input type="url" name="lock_background_image" class="form-control"
-                  placeholder="https://..."
-                  value="<?= htmlspecialchars($s['lock_background_image'] ?? '') ?>">
+                <label class="form-label">Background image URLs <small class="text-muted">(one per line; rotates for every agent together)</small></label>
+                <textarea name="lock_background_image" class="form-control" rows="4"
+                  placeholder="https://example.com/slide-1.jpg&#10;https://example.com/slide-2.jpg"><?= htmlspecialchars($s['lock_background_image'] ?? '') ?></textarea>
+              </div>
+              <div class="col-lg-2">
+                <label class="form-label">Slide interval (seconds)</label>
+                <input type="number" name="lock_background_rotation_seconds" class="form-control" min="30" max="86400"
+                  value="<?= (int)($s['lock_background_rotation_seconds'] ?? 300) ?>">
               </div>
               <div class="col-lg-6">
                 <label class="form-label">Logo image URL</label>

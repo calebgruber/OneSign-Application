@@ -15,9 +15,32 @@ function getSetting(string $key, string $default = ''): string {
     return $row ? (string)$row['setting_value'] : $default;
 }
 
+function getLockBackgroundRotationSeconds(): int {
+    return max(30, (int)getSetting('lock_background_rotation_seconds', '300'));
+}
+
+function getActiveLockBackgroundImage(): string {
+    $raw = getSetting('lock_background_image', '');
+    $images = array_values(array_filter(array_map(
+        static fn(string $value): string => trim($value),
+        preg_split('/\R+/', $raw) ?: []
+    ), static fn(string $value): bool => $value !== ''));
+
+    if ($images === []) {
+        return '';
+    }
+    if (count($images) === 1) {
+        return $images[0];
+    }
+
+    $interval = getLockBackgroundRotationSeconds();
+    $index = (int)(floor(time() / $interval) % count($images));
+    return $images[$index];
+}
+
 function getAgentUiSettings(): array {
     return [
-        'lock_background_image' => getSetting('lock_background_image', ''),
+        'lock_background_image' => getActiveLockBackgroundImage(),
         'lock_logo_image'       => getSetting('lock_logo_image', ''),
         'lock_brand_name'       => getSetting('lock_brand_name', 'Secure log in'),
         'lock_color_primary'    => getSetting('lock_color_primary', '#2B4D89'),
