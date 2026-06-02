@@ -4,6 +4,9 @@
  */
 require_once __DIR__ . '/../config/database.php';
 
+const LOCK_BACKGROUND_ROTATION_MIN_SECONDS = 30;
+const LOCK_BACKGROUND_ROTATION_DEFAULT_SECONDS = 300;
+
 function db(): PDO {
     return Database::getConnection();
 }
@@ -16,20 +19,18 @@ function getSetting(string $key, string $default = ''): string {
 }
 
 function getLockBackgroundRotationSeconds(): int {
-    $minimumSeconds = 30;
-    $seconds = (int)getSetting('lock_background_rotation_seconds', '300');
+    $seconds = (int)getSetting('lock_background_rotation_seconds', (string)LOCK_BACKGROUND_ROTATION_DEFAULT_SECONDS);
     if ($seconds <= 0) {
-        $seconds = 300;
+        $seconds = LOCK_BACKGROUND_ROTATION_DEFAULT_SECONDS;
     }
-    return max($minimumSeconds, $seconds);
+    return max(LOCK_BACKGROUND_ROTATION_MIN_SECONDS, $seconds);
 }
 
 function getActiveLockBackgroundImage(): string {
     $raw = getSetting('lock_background_image', '');
-    $images = array_values(array_filter(array_map(
-        static fn(string $value): string => trim($value),
-        preg_split('/\R+/', $raw) ?: []
-    ), static fn(string $value): bool => $value !== ''));
+    $lines = preg_split('/\R+/', $raw) ?: [];
+    $trimmedLines = array_map(static fn(string $value): string => trim($value), $lines);
+    $images = array_values(array_filter($trimmedLines, static fn(string $value): bool => $value !== ''));
 
     if ($images === []) {
         return '';

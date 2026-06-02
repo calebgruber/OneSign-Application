@@ -238,12 +238,13 @@ include __DIR__ . '/../includes/header.php';
                 <textarea name="lock_background_image" class="form-control" rows="4"
                   placeholder="https://example.com/slide-1.jpg
 https://example.com/slide-2.jpg"><?= htmlspecialchars($s['lock_background_image'] ?? '') ?></textarea>
-                <div class="form-hint">Enter one image URL per line.</div>
+                <div class="form-hint">Enter one image URL per line. The server picks the active slide by time interval so every agent shows the same background during each rotation window.</div>
               </div>
               <div class="col-lg-2">
                 <label class="form-label">Slide interval (seconds)</label>
-                <input type="number" name="lock_background_rotation_seconds" class="form-control" min="30" max="86400"
-                  value="<?= (int)($s['lock_background_rotation_seconds'] ?? 300) ?>">
+                <input type="number" name="lock_background_rotation_seconds" class="form-control"
+                  min="<?= LOCK_BACKGROUND_ROTATION_MIN_SECONDS ?>" max="86400"
+                  value="<?= (int)($s['lock_background_rotation_seconds'] ?? LOCK_BACKGROUND_ROTATION_DEFAULT_SECONDS) ?>">
               </div>
               <div class="col-lg-6">
                 <label class="form-label">Logo image URL</label>
